@@ -870,12 +870,16 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'f':
-			filt_unit = strtol(optarg, &pp, 10);
+			filt_unit = strtol(optarg, &pp, 0);
+			if (optarg == pp)
+				filt_unit = -1;
+			else if (filt_unit < 0 && filt_unit != -1)
+				usage();
 			filt_ep = -1;
 			if (pp != NULL) {
 				if (*pp == '.') {
-					filt_ep = strtol(pp + 1, &pp, 10);
-					if (pp != NULL && *pp != 0)
+					filt_ep = strtol(pp + 1, &pp, 0);
+					if ((pp != NULL && *pp != 0) || (filt_ep < 0 && filt_unit != -1))
 						usage();
 				} else if (*pp != 0) {
 					usage();
