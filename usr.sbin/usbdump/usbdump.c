@@ -279,6 +279,44 @@ match_filter(int unit, int endpoint)
 }
 
 static void
+check_filter(int should_remove)
+{
+	struct usb_filt *puf;
+	struct usb_filt *puf_temp;
+	struct usb_filt *puf2;
+	
+	STAILQ_FOREACH_SAFE(puf, &usb_filt_head, entry, puf_temp) {
+		if (puf->unit == -1 || puf->endpoint != -1)
+			continue;
+		
+		int has_more_specific = 0;
+		
+		STAILQ_FOREACH(puf2, &usb_filt_head, entry) {
+			if (puf == puf2)
+				continue;
+			
+			if ((puf2->unit == -1 || puf2->unit == puf->unit) &&
+				(puf2->endpoint != -1)) {
+				has_more_specific = 1;
+				
+				if (!should_remove && verbose >= 1)
+					printf("Filter %d.%d is overlapped by filter %d.-1, either remove the offending filter or invoke without -p\n", puf2->unit, puf2->endpoint, puf->unit);
+				
+				break;
+			}
+		}
+		
+		if (should_remove && has_more_specific) {
+			if (verbose >= 1)
+				printf("Pruned %d.-1 due to at least one or more filters which are more specific than it existing\n", puf->unit);
+			
+			STAILQ_REMOVE(&usb_filt_head, puf, usb_filt, entry);
+			free(puf);
+		}
+	}
+}
+
+static void
 free_filter(struct bpf_program *pprog)
 {
 	struct usb_filt *puf;
@@ -784,6 +822,7 @@ usage(void)
 	fprintf(stderr, FMT, "-d [ugen]B.D.E", "Listen on bus, B, device, D, and endpoint E");
 	fprintf(stderr, FMT, "-i <usbusX>", "Listen on this bus interface");
 	fprintf(stderr, FMT, "-f <unit[.endpoint]>", "Specify a device and endpoint filter");
+	fprintf(stderr, FMT, "-p", "Disable ignoring unit filters which overlap endpoint filters");
 	fprintf(stderr, FMT, "-r <file>", "Read the raw packets from file");
 	fprintf(stderr, FMT, "-s <snaplen>", "Snapshot bytes from each packet");
 	fprintf(stderr, FMT, "-v", "Increase the verbose level");
@@ -824,6 +863,7 @@ main(int argc, char *argv[])
 	uint32_t v;
 	int fd;
 	int o;
+	int prune = 1;
 	int filt_unit;
 	int filt_ep;
 	int s;
@@ -831,7 +871,7 @@ main(int argc, char *argv[])
 	const char *optstring;
 	char *pp;
 
-	optstring = "b:d:hi:r:s:vw:f:";
+	optstring = "b:d:hi:r:s:vw:f:p";
 	while ((o = getopt(argc, argv, optstring)) != -1) {
 		switch (o) {
 		case 'b':
@@ -889,6 +929,9 @@ main(int argc, char *argv[])
 			break;
 		case 'i':
 			i_arg = optarg;
+			break;
+		case 'p':
+			prune = 0;
 			break;
 		case 'r':
 			r_arg = optarg;
@@ -988,6 +1031,9 @@ main(int argc, char *argv[])
 	p->buffer = (uint8_t *)malloc(p->bufsize);
 	if (p->buffer == NULL)
 		errx(EX_SOFTWARE, "Out of memory.");
+
+	/* delayed until after all filters are added */
+	check_filter(prune);
 
 	make_filter(&total_prog, snapshot);
 
