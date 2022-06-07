@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 14, 2021
+.Dd June 14, 2022
 .Dt USBDUMP 8
 .Os
 .Sh NAME
@@ -42,6 +42,7 @@
 .Op Fl v
 .Op Fl w Ar file
 .Op Fl f Ar filter
+.Op Fl p
 .Op Fl b Ar file
 .Op Fl h
 .Sh DESCRIPTION
@@ -79,14 +80,20 @@ be the same.
 .It Fl b Ar file
 Store data part of the USB trace in binary format to the given
 .Ar file .
-This option also works with the -r and -f options.
+This option also works with the
+.Fl r
+and
+.Fl f
+options.
 .It Fl i Ar ifname
 Listen on USB bus interface
 .Ar ifname .
 .It Fl r Ar file
 Read the raw packets from
 .Ar file .
-This option also works with the -f option.
+This option also works with the
+.Fl f
+option.
 .It Fl s Ar snaplen
 Snapshot
 .Ar snaplen
@@ -97,7 +104,11 @@ When defined multiple times the verbosity level increases.
 .It Fl w Ar file
 Write the raw packets to
 .Ar file .
-This option also works with the -s and -v options.
+This option also works with the
+.Fl s
+and
+.Fl v
+options.
 .It Fl f Ar filter
 The filter argument consists of either one or two numbers separated by a dot.
 The first indicates the device unit number which should be traced.
@@ -108,6 +119,10 @@ If 128 is added to the endpoint number that means IN direction, else OUT directi
 A device unit or endpoint value of -1 means ignore this field.
 If no filters are specified, all packets are passed through using the default -1,-1 filter.
 This option can be specified multiple times.
+.It Fl p
+Do not ignore device unit number filters which overlap device endpoint filters.
+Without this option, if a unit filter overlaps any endpoint filters, the unit filter
+is ignored and only the endpoint filters are used to limit output.
 .It Fl h
 This option displays a summary of the command line options.
 .El
@@ -129,6 +144,23 @@ of device unit number 3:
 Read and display the USB raw packets from previous file:
 .Pp
 .Dl "usbdump -r /tmp/dump_pkts -v"
+.Pp
+Display the USB raw packets from usbus2 unit 3, with equivalent combinations of arguments:
+.Pp
+.Dl "usbdump -i usbus2 -f 3"
+.Dl "usbdump -d ugen2 -f 3"
+.Dl "usbdump -d ugen2.3"
+.Pp
+Display the USB raw packets from usbus2 unit 3 endpoint 4, with equivalent combinations of arguments:
+.Pp
+.Dl "usbdump -i usbus2 -f 3.4"
+.Dl "usbdump -d ugen2 -f 3.4"
+.Dl "usbdump -d ugen2.3 -f .4"
+.Dl "usbdump -d ugen2.3.4"
+.Pp
+Note: if the
+.Fl p
+option is specified, the third command will match all packets on endpoint 4.
 .Sh OUTPUT FORMAT
 The output format of
 .Nm
@@ -179,6 +211,16 @@ If this is a USB done, its value is
 .It <...>
 Optional field used for printing an error string if the packet is from USB done.
 .El
+.Sh COMPATIBILITY
+Originally, unit filters which overlapped endpoint filters would cause the endpoint
+filters to have no effect, as the unit filters would accept all packets, including
+those which might not match any endpoint filters.
+.Pp
+This behavior is corrected by automatically removing any unit filters which overlap
+any endpoint or unit.endpoint filters.
+To disable automatic removal and revert to the old behavior, invoke with the
+.Fl p
+option.
 .Sh SEE ALSO
 .Xr usbconfig 8
 .Sh AUTHORS
