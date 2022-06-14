@@ -59,16 +59,7 @@ option.
 The argument may be prefixed by "ugen".
 The option may be specified multiple times, but the bus specified must
 be the same.
-.It Fl d Ar [ugen]bus.device
-Shortcut for
-.Fl i
-and
-.Fl f
-options.
-The argument may be prefixed by "ugen".
-The option may be specified multiple times, but the bus specified must
-be the same.
-.It Fl d Ar [ugen]bus.device.endpoint
+.It Fl d Ar [ugen]bus.device , Fl d Ar [ugen]bus.device.endpoint
 Shortcut for
 .Fl i
 and
@@ -78,22 +69,17 @@ The argument may be prefixed by "ugen".
 The option may be specified multiple times, but the bus specified must
 be the same.
 .It Fl b Ar file
-Store data part of the USB trace in binary format to the given
+Write the raw packet data without any headers to the given
 .Ar file .
-This option also works with the
-.Fl r
-and
-.Fl f
-options.
+This option does not work with the
+.Fl w
+option.
 .It Fl i Ar ifname
 Listen on USB bus interface
 .Ar ifname .
 .It Fl r Ar file
 Read the raw packets from
 .Ar file .
-This option also works with the
-.Fl f
-option.
 .It Fl s Ar snaplen
 Snapshot
 .Ar snaplen
@@ -104,11 +90,9 @@ When defined multiple times the verbosity level increases.
 .It Fl w Ar file
 Write the raw packets to
 .Ar file .
-This option also works with the
-.Fl s
-and
-.Fl v
-options.
+This option does not work with the
+.Fl b
+option.
 .It Fl f Ar filter
 The filter argument consists of either one or two numbers separated by a dot.
 The first indicates the device unit number which should be traced.
