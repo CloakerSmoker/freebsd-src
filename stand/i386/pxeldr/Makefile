@@ -67,9 +67,12 @@ pxeldr.out: pxeldr.o
 
 CLEANFILES+= pxeldr.bin pxeldr.out
 
-pxeldr1.ld: pxeldr1.bin ${BTXLDR} ${BTXKERN}
-	btxld -v -E ${ORG2} -f bin -b ${BTXKERN} -l ${BTXLDR} \
+pxeldr1.ld: pxeldr1.bin pxeldr1.ldr ${BTXKERN}
+	btxld -v -E ${ORG2} -f bin -b ${BTXKERN} -l pxeldr1.ldr \
 	    -o ${.TARGET} -P 1 pxeldr1.bin
+
+pxeldr1.ldr:
+	${DD} if=/dev/zero of=${.TARGET} bs=512 count=1
 
 pxeldr1.bin: pxeldr1.out
 	${OBJCOPY} -S -O binary pxeldr1.out ${.TARGET}

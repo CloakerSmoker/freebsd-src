@@ -51,6 +51,13 @@
 		.set MEM_BTX_OFFSET,MEM_PAGE_SIZE # offset of BTX in the loader
 		.set MEM_BTX_CLIENT,0xa000	# where BTX clients live
 		.set MEM_BIOS_KEYBOARD,0x496	# BDA byte with keyboard bit
+
+/*
+ * btx header fields
+ */
+		.set BTX_TEXT_SIZE,0xA
+		.set BTX_ENTRY,0xC
+
 /*
  * a.out header fields
  */
@@ -129,74 +136,35 @@ start:		cld				# string ops inc
 		jnz keyb			# yes, so skip
 		orl $(RB_MULTIPLE | RB_SERIAL), (%bx) # enable serial console
 keyb:
-#endif
-/*
- * Turn on the A20 address line
+#endif	
+
+/* 
+ * Relocate the BTX client
  */
-		callw seta20			# Turn A20 on
+	xorw %ax, %ax			# zero %ax and set
+	movw %ax, %ds			#  %ds and %es
+	movw %ax, %es			#  to segment 0
+ 
+ 	movw (end+BTX_TEXT_SIZE),%si
+	addw end,%si
+	movw MEM_BTX_CLIENT,%di
+	movw BTX_CLIENT_SIZE,%cx
+	
+	rep
+	movsb
+	
 /*
- * Relocate the loader and BTX using a very lazy protected mode
+ * Relocate the BTX server
  */
-		movw $relocate_msg, %si		# Display the
-		callw putstr			#  relocation message
-		movl end+AOUT_ENTRY, %edi	# %edi is the destination
-		movl $(end+AOUT_HEADER), %esi	# %esi is
-						#  the start of the text
-						#  segment
-		movl end+AOUT_TEXT, %ecx	# %ecx = length of the text
-						#  segment
-		lgdt gdtdesc			# setup our own gdt
-		cli				# turn off interrupts
-		movl %cr0, %eax			# Turn on
-		orb $0x1, %al			#  protected
-		movl %eax, %cr0			#  mode
-		ljmp $SEL_SCODE,$pm_start	# long jump to clear the
-						#  instruction pre-fetch queue
-		.code32
-pm_start:	movw $SEL_SDATA, %ax		# Initialize
-		movw %ax, %ds			#  %ds and
-		movw %ax, %es			#  %es to a flat selector
-		rep				# Relocate the
-		movsb				#  text segment
-		addl $(MEM_PAGE_SIZE - 1), %edi	# pad %edi out to a new page
-		andl $~(MEM_PAGE_SIZE - 1), %edi #  for the data segment
-		movl end+AOUT_DATA, %ecx	# size of the data segment
-		rep				# Relocate the
-		movsb				#  data segment
-		movl end+AOUT_BSS, %ecx		# size of the bss
-		xorl %eax, %eax			# zero %eax
-		addb $3, %cl			# round %ecx up to
-		shrl $2, %ecx			#  a multiple of 4
-		rep				# zero the
-		stosl				#  bss
-		movl end+AOUT_ENTRY, %esi	# %esi -> relocated loader
-		addl $MEM_BTX_OFFSET, %esi	# %esi -> BTX in the loader
-		movl $MEM_BTX_ADDRESS, %edi	# %edi -> where BTX needs to go
-		movzwl 0xa(%esi), %ecx		# %ecx -> length of BTX
-		rep				# Relocate
-		movsb				#  BTX
-		ljmp $SEL_SCODE16,$pm_16	# Jump to 16-bit PM
-		.code16
-pm_16:		movw $SEL_RDATA, %ax		# Initialize
-		movw %ax, %ds			#  %ds and
-		movw %ax, %es			#  %es to a real mode selector
-		movl %cr0, %eax			# Turn off
-		andb $~0x1, %al			#  protected
-		movl %eax, %cr0			#  mode
-		ljmp $0,$pm_end			# Long jump to clear the
-						#  instruction pre-fetch queue
-pm_end:		sti				# Turn interrupts back on now
-/*
- * Copy the BTX client to MEM_BTX_CLIENT
- */
-		xorw %ax, %ax			# zero %ax and set
-		movw %ax, %ds			#  %ds and %es
-		movw %ax, %es			#  to segment 0
-		movw $MEM_BTX_CLIENT, %di	# Prepare to relocate
-		movw $btx_client, %si		#  the simple btx client
-		movw $(btx_client_end-btx_client), %cx # length of btx client
-		rep				# Relocate the
-		movsb				#  simple BTX client
+ 	movw end,%si
+	movw MEM_BTX_ADDRESS,%di
+	movw (end+BTX_TEXT_SIZE),%cx
+	
+	rep
+	movsb
+
+	sti				# Turn interrupts back on now
+
 /*
  * Copy the boot[12] args to where the BTX client can see them
  */
