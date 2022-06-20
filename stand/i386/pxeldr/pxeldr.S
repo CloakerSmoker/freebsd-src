@@ -138,46 +138,38 @@ start:		cld				# string ops inc
 keyb:
 #endif	
 
-		callw seta20
+		callw seta20 # enable A20, since BTX needs it later
 
 		movw $relocate_msg, %si		# %ds:(%si) -> boot args message
 		callw putstr			# display the message
 
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-		nop
-
 /* 
  * Relocate the BTX client
  */
-	xorw %ax, %ax			# zero %ax and set
-	movw %ax, %ds			#  %ds and %es
-	movw %ax, %es			#  to segment 0
- 
- 	movw (end+BTX_TEXT_SIZE),%si
-	addw $end,%si
-	movw $MEM_BTX_CLIENT,%di
-	addw (end+BTX_ENTRY),%di
-	movw $BTX_CLIENT_SIZE,%cx
+		xorw %ax, %ax			# zero %ax and set
+		movw %ax, %ds			#  %ds and %es
+		movw %ax, %es			#  to segment 0
 	
-	rep
-	movsb
+		movw (end+BTX_TEXT_SIZE),%si	# get pointer to client
+		addw $end,%si					# with (BTX + BTX.Size)
+		movw $MEM_BTX_CLIENT,%di		# get client address
+		addw (end+BTX_ENTRY),%di		# offset by client load address
+		movw $BTX_CLIENT_SIZE,%cx		# compiled in
+		
+		rep
+		movsb
 	
 /*
  * Relocate the BTX server
  */
- 	movw $end,%si
-	movw $MEM_BTX_ADDRESS,%di
-	movw (end+BTX_TEXT_SIZE),%cx
-	
-	rep
-	movsb
+		movw $end,%si					# BTX kernel data
+		movw $MEM_BTX_ADDRESS,%di		# BTX kernel load address
+		movw (end+BTX_TEXT_SIZE),%cx	# size
+		
+		rep
+		movsb
 
-	sti				# Turn interrupts back on now
+		sti				# Turn interrupts back on now
 
 /*
  * Copy the boot[12] args to where the BTX client can see them
@@ -187,12 +179,7 @@ keyb:
 		movw $(MEM_ARG_SIZE/4), %cx	# size of the arguments in longs
 		rep				# Relocate
 		movsl				#  the words
-/*
- * Save the entry point so the client can get to it later on
- */
-		movl end+AOUT_ENTRY, %eax	# load the entry point
-		stosl				# add it to the end of the
-						#  arguments
+
 /*
  * Now we just start up BTX and let it do the rest
  */
@@ -235,43 +222,6 @@ seta20.2:	inb $0x64,%al			# Get status
 		outb %al,$0x60			#  A20
 seta20.3:	sti				# Enable interrupts
 		retw				# To caller
-
-/*
- * BTX client to start btxldr
- */
-		.code32
-btx_client:	movl $(MEM_ARG_BTX-MEM_BTX_CLIENT+MEM_ARG_SIZE-4), %esi
-						# %ds:(%esi) -> end
-						#  of boot[12] args
-		movl $(MEM_ARG_SIZE/4), %ecx	# Number of words to push
-		std				# Go backwards
-push_arg:	lodsl				# Read argument
-		pushl %eax			# Push it onto the stack
-		loop push_arg			# Push all of the arguments
-		cld				# In case anyone depends on this
-		pushl MEM_ARG_BTX-MEM_BTX_CLIENT+MEM_ARG_SIZE # Entry point of
-						#  the loader
-		pushl %eax			# Emulate a near call
-		movl $0x1, %eax			# 'exec' system call
-		int $INT_SYS			# BTX system call
-btx_client_end:
-		.code16
-
-		.p2align 4
-/*
- * Global descriptor table.
- */
-gdt:		.word 0x0,0x0,0x0,0x0		# Null entry
-		.word 0xffff,0x0,0x9200,0xcf	# SEL_SDATA
-		.word 0xffff,0x0,0x9200,0x0	# SEL_RDATA
-		.word 0xffff,0x0,0x9a00,0xcf	# SEL_SCODE (32-bit)
-		.word 0xffff,0x0,0x9a00,0x8f	# SEL_SCODE16 (16-bit)
-gdt.1:
-/*
- * Pseudo-descriptors.
- */
-gdtdesc:	.word gdt.1-gdt-1		# Limit
-		.long gdt			# Base
 
 welcome_msg:	.asciz	"PXE Loader 1.00\r\n\n"
 bootinfo_msg:	.asciz	"Building the boot loader arguments\r\n"
