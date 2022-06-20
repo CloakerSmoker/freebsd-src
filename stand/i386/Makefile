@@ -19,7 +19,7 @@ SUBDIR.${MK_LOADER_LUA}+= loader_lua
 SUBDIR.yes+=	loader_simp
 
 # special boot programs, 'self-extracting boot2+loader'
-SUBDIR.yes+=	pxeldr
+SUBDIR.yes+=	pxeldr pxeloader
 
 SUBDIR.${MK_LOADER_ZFS}+=	zfsboot gptzfsboot
 
