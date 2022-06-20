@@ -138,6 +138,19 @@ start:		cld				# string ops inc
 keyb:
 #endif	
 
+		callw seta20
+
+		movw $relocate_msg, %si		# %ds:(%si) -> boot args message
+		callw putstr			# display the message
+
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+		nop
+
 /* 
  * Relocate the BTX client
  */
@@ -146,9 +159,10 @@ keyb:
 	movw %ax, %es			#  to segment 0
  
  	movw (end+BTX_TEXT_SIZE),%si
-	addw end,%si
-	movw MEM_BTX_CLIENT,%di
-	movw BTX_CLIENT_SIZE,%cx
+	addw $end,%si
+	movw $MEM_BTX_CLIENT,%di
+	addw (end+BTX_ENTRY),%di
+	movw $BTX_CLIENT_SIZE,%cx
 	
 	rep
 	movsb
@@ -156,8 +170,8 @@ keyb:
 /*
  * Relocate the BTX server
  */
- 	movw end,%si
-	movw MEM_BTX_ADDRESS,%di
+ 	movw $end,%si
+	movw $MEM_BTX_ADDRESS,%di
 	movw (end+BTX_TEXT_SIZE),%cx
 	
 	rep
@@ -261,7 +275,7 @@ gdtdesc:	.word gdt.1-gdt-1		# Limit
 
 welcome_msg:	.asciz	"PXE Loader 1.00\r\n\n"
 bootinfo_msg:	.asciz	"Building the boot loader arguments\r\n"
-relocate_msg:	.asciz	"Relocating the loader and the BTX\r\n"
+relocate_msg:	.asciz	"Relocating the BTX\r\n"
 jump_message:	.asciz	"Starting the BTX loader\r\n"
 
 		.p2align 4

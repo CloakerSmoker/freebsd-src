@@ -62,8 +62,8 @@ pxeboot: pxeldr.bin pxeldr1.ld
 pxeldr.bin: pxeldr.out
 	${OBJCOPY} -S -O binary pxeldr.out ${.TARGET}
 
-pxeldr.out: pxeldr.o
-	${LD} ${LD_FLAGS} --defsym ORG=${ORG1} -T ${LDSCRIPT} -o ${.TARGET} pxeldr.o
+pxeldr.out: pxeldr.o pxeldr1.bin
+	${LD} ${LD_FLAGS} --defsym BTX_CLIENT_SIZE=`ls -l pxeldr1.bin | awk '{print $$5}'` --defsym ORG=${ORG1} -T ${LDSCRIPT} -o ${.TARGET} pxeldr.o
 
 CLEANFILES+= pxeldr.bin pxeldr.out
 
@@ -85,7 +85,7 @@ CFLAGS.ashldi3.c=	-Wno-missing-prototypes -Wno-missing-declarations
 CLEANFILES+=	ashldi3.o
 
 pxeldr1.out: ${BTXCRT} pxeldr1.o sio.o ashldi3.o
-	${LD} ${LD_FLAGS} --defsym ORG=${ORG2} -T ${LDSCRIPT} -o ${.TARGET} ${.ALLSRC}
+	${LD} ${LD_FLAGS} --defsym ORG=${ORG2} --defsym ORG=${ORG2} -T ${LDSCRIPT} -o ${.TARGET} ${.ALLSRC}
 
 CLEANFILES+= pxeldr1.out sio.o
 
