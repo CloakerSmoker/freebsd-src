@@ -4,8 +4,21 @@
 
 PROG=	crt0.o
 INTERNALPROG=
-SRCS=	btxcsu.S btxsys.S btxv86.S
+SRCS=	btxcsu.S btxsys.S btxv86.S stdio.c
 CFLAGS+=-I${BOOTSRC}/i386/common
+CFLAGS+=-I${BOOTSRC}/common
 LDFLAGS+=-Wl,-r
+
+
+.if defined(BTX_SERIAL)
+CFLAGS+=-DBTX_SERIAL
+.endif
+
+BOOT_COMCONSOLE_PORT?= 0x3f8
+BOOT_COMCONSOLE_SPEED?= 9600
+B2SIOFMT?=	0x3
+
+CFLAGS+=-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
+	-DSIOFMT=${B2SIOFMT} -DSIOSPD=${BOOT_COMCONSOLE_SPEED}
 
 .include <bsd.prog.mk>
