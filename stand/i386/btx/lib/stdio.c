@@ -34,7 +34,7 @@ void
 xputchar(int c) {
 	if (DO_SIO)
 		sio_putc(c);
-	if (DO_KBD) 
+	if (DO_KBD)
 		bios_putchar(c);
 }
 
@@ -75,6 +75,25 @@ printf(const char *fmt,...)
 				while (u /= 10U);
 				while (--s >= buf)
 					putchar(*s);
+				continue;
+			case 'x':
+				c = va_arg(ap, int);
+				
+				char buf[9] = { 0 };
+				char* tail = &buf[8];
+				
+				do
+				{
+					*--tail = "0123456789ABCDEF"[c & 0xF];
+					c >>= 4;
+				} while (c != 0);
+				
+				putchar('0');
+				putchar('x');
+				
+				while (*tail)
+					putchar(*tail++);
+				
 				continue;
 			}
 		}
@@ -176,4 +195,24 @@ gets(char* p)
 	}
 	
 	return p;
+}
+
+struct btx_file_provider provider;
+
+int 
+open(const char *path, int mode)
+{
+	return (int)provider.open(path);
+}
+
+ssize_t
+read(int ino, void* buf, size_t size)
+{
+	return provider.read((btx_ino_t)ino, buf, size);
+}
+
+void
+close(int ino)
+{
+	provider.close((btx_ino_t)ino);
 }

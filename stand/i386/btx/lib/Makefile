@@ -4,7 +4,7 @@
 
 PROG=	crt0.o
 INTERNALPROG=
-SRCS=	btxcsu.S btxsys.S btxv86.S stdio.c
+SRCS=	btxcsu.S btxsys.S btxv86.S stdio.c stdlib.c
 CFLAGS+=-I${BOOTSRC}/i386/common
 CFLAGS+=-I${BOOTSRC}/common
 LDFLAGS+=-Wl,-r
