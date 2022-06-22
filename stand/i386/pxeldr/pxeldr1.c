@@ -31,26 +31,35 @@ __FBSDID("$FreeBSD$");
 
 #include <btxv86.h>
 
+struct bootargs
+{
+	uint32_t			howto;
+	uint32_t			bootdev;
+	uint32_t			bootflags;
+	union {
+		struct {
+			uint32_t	pxeinfo;
+			uint32_t	reserved;
+		};
+		uint64_t		zfspool;
+	};
+	uint32_t			bootinfo;
+
+	/*
+	 * If KARGS_FLAGS_EXTARG is set in bootflags, then the above fields
+	 * are followed by a uint32_t field that specifies a size of the
+	 * extended arguments (including the size field).
+	 */
+};
+
 //#include "boot2.h"
 #include "lib.h"
 #include "paths.h"
 #include "rbx.h"
+#include "stdio.h"
 
-/* Define to 0 to omit serial support */
-#ifndef SERIAL
-#define SERIAL 1
-#endif
-
-#define IO_KEYBOARD	1
-#define IO_SERIAL	2
-
-#if SERIAL
-#define DO_KBD (ioctrl & IO_KEYBOARD)
-#define DO_SIO (ioctrl & IO_SERIAL)
-#else
-#define DO_KBD (1)
-#define DO_SIO (0)
-#endif
+#include "litepxe.h"
+//#include <pxe.h>
 
 #define SECOND		18	/* Circa that many ticks in a second. */
 
@@ -69,6 +78,8 @@ __FBSDID("$FreeBSD$");
 #define TYPE_FD		2
 
 extern uint32_t _end;
+
+static struct bootargs *kargs;
 
 static const char optstr[NOPT] = "DhaCcdgmnpqrsv"; /* Also 'P', 'S' */
 static const unsigned char flags[NOPT] = {
@@ -104,23 +115,13 @@ static char cmd[512], cmddup[512], knamebuf[1024];
 static const char *kname;
 uint32_t opts;
 static struct bootinfo bootinfo;
-#if SERIAL
-static int comspeed = SIOSPD;
-static uint8_t ioctrl = IO_KEYBOARD;
-#endif
 
 int main(void);
 void exit(int);
 static void load(void);
 static int parse(void);
 static int dskread(void *, unsigned, unsigned);
-static void printf(const char *,...);
-static void putchar(int);
 static int drvread(void *, unsigned, unsigned);
-static int keyhit(unsigned);
-static int xputc(int);
-static int xgetc(int);
-static inline int getc(int);
 
 static void memcpy(void *, const void *, int);
 static void
@@ -158,52 +159,18 @@ xfsread(ufs_ino_t inode, void *buf, size_t nbyte)
 	return (0);
 }
 
-static inline void
-getstr(void)
-{
-	char *s;
-	int c;
-
-	s = cmd;
-	for (;;) {
-		switch (c = xgetc(0)) {
-		case 0:
-			break;
-		case '\177':
-		case '\b':
-			if (s > cmd) {
-				s--;
-				printf("\b \b");
-			}
-			break;
-		case '\n':
-		case '\r':
-			*s = 0;
-			return;
-		default:
-			if (s - cmd < sizeof(cmd) - 1)
-				*s++ = c;
-			putchar(c);
-		}
-	}
-}
-
-static inline void
-putc(int c)
-{
-
-	v86.addr = 0x10;
-	v86.eax = 0xe00 | (c & 0xff);
-	v86.ebx = 0x7;
-	v86int();
-}
-
 int
 main(void)
 {
 	uint8_t autoboot;
 	ufs_ino_t ino;
 	size_t nbyte;
+	
+	kargs = (void*)__args;
+	
+	printf("kargs %x\n", kargs);
+	
+	printf("kargs .flags: %x\nkargs .pxe: %x\n", kargs->bootflags, kargs->pxeinfo);
 
 	dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
 	v86.ctl = V86_FLAGS;
@@ -214,6 +181,12 @@ main(void)
 	dsk.slice = *(uint8_t *)PTOV(ARGS + 1) + 1;
 	bootinfo.bi_version = BOOTINFO_VERSION;
 	bootinfo.bi_size = sizeof(bootinfo);
+
+	pxe_enable((void*)kargs->pxeinfo);
+	
+	if (!pxe_init()) {
+		printf("Could not initialize PXE\n");
+	}
 
 	/* Process configuration file */
 	
@@ -261,10 +234,10 @@ main(void)
 				 "boot: ",
 			    dsk.drive & DRV_MASK, dev_nm[dsk.type], dsk.unit,
 			    'a' + dsk.part, kname);
-		if (DO_SIO)
+		if (SERIAL)
 			sio_flush();
 		if (!autoboot || keyhit(3*SECOND))
-			getstr();
+			gets(cmd);
 		else if (!autoboot || !OPT_CHECK(RBX_QUIET))
 			putchar('\n');
 		autoboot = 0;
@@ -364,7 +337,10 @@ parse()
 	char *arg, *ep, *p, *q;
 	const char *cp;
 	unsigned int drv;
-	int c, i, j;
+	int c, i;
+#if SERIAL
+	int j;
+#endif
 	size_t k;
 
 	arg = cmd;
@@ -537,52 +513,6 @@ error:
 	return (-1);
 }
 
-static void
-printf(const char *fmt,...)
-{
-	va_list ap;
-	static char buf[10];
-	char *s;
-	unsigned u;
-	int c;
-
-	va_start(ap, fmt);
-	while ((c = *fmt++)) {
-		if (c == '%') {
-			c = *fmt++;
-			switch (c) {
-			case 'c':
-				putchar(va_arg(ap, int));
-				continue;
-			case 's':
-				for (s = va_arg(ap, char *); *s; s++)
-					putchar(*s);
-				continue;
-			case 'u':
-				u = va_arg(ap, unsigned);
-				s = buf;
-				do
-					*s++ = '0' + u % 10U;
-				while (u /= 10U);
-				while (--s >= buf)
-					putchar(*s);
-				continue;
-			}
-		}
-		putchar(c);
-	}
-	va_end(ap);
-	return;
-}
-
-static void
-putchar(int c)
-{
-
-	if (c == '\n')
-		xputc('\r');
-	xputc(c);
-}
 
 static int
 drvread(void *buf, unsigned lba, unsigned nblk)
@@ -590,8 +520,8 @@ drvread(void *buf, unsigned lba, unsigned nblk)
 	static unsigned c = 0x2d5c7c2f;
 
 	if (!OPT_CHECK(RBX_QUIET)) {
-		xputc(c = c << 8 | c >> 24);
-		xputc('\b');
+		putchar(c = c << 8 | c >> 24);
+		putchar('\b');
 	}
 	v86.ctl = V86_ADDR | V86_CALLF | V86_FLAGS;
 	//v86.addr = XREADORG;		/* call to xread in boot1 */
@@ -607,60 +537,4 @@ drvread(void *buf, unsigned lba, unsigned nblk)
 		return (-1);
 	}
 	return (0);
-}
-
-static int
-keyhit(unsigned ticks)
-{
-	uint32_t t0, t1;
-
-	if (OPT_CHECK(RBX_NOINTR))
-		return (0);
-	t0 = 0;
-	for (;;) {
-		if (xgetc(1))
-			return (1);
-		t1 = *(uint32_t *)PTOV(0x46c);
-		if (!t0)
-			t0 = t1;
-		if ((uint32_t)(t1 - t0) >= ticks)
-			return (0);
-	}
-}
-
-static int
-xputc(int c)
-{
-
-	if (DO_KBD)
-		putc(c);
-	if (DO_SIO)
-		sio_putc(c);
-	return (c);
-}
-
-static int
-getc(int fn)
-{
-
-	v86.addr = 0x16;
-	v86.eax = fn << 8;
-	v86int();
-	return (fn == 0 ? v86.eax & 0xff : !V86_ZR(v86.efl));
-}
-
-static int
-xgetc(int fn)
-{
-
-	if (OPT_CHECK(RBX_NOINTR))
-		return (0);
-	for (;;) {
-		if (DO_KBD && getc(1))
-			return (fn ? 1 : getc(0));
-		if (DO_SIO && sio_ischar())
-			return (fn ? 1 : sio_getc());
-		if (fn)
-			return (0);
-	}
 }

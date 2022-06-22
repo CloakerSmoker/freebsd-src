@@ -30,6 +30,10 @@ CFLAGS+=-I${BOOTSRC}/i386/common
 CFLAGS+=-I${BOOTSRC}/i386/libi386
 CFLAGS+=-I${BOOTSRC}/common
 
+.if defined(BTX_SERIAL)
+CFLAGS+=-DBTX_SERIAL
+.endif
+
 BOOT_COMCONSOLE_PORT?= 0x3f8
 BOOT_COMCONSOLE_SPEED?= 9600
 B2SIOFMT?=	0x3
@@ -84,11 +88,11 @@ CLEANFILES+= pxeldr1.ld pxeldr1.bin
 CFLAGS.ashldi3.c=	-Wno-missing-prototypes -Wno-missing-declarations
 CLEANFILES+=	ashldi3.o
 
-pxeldr1.out: ${BTXCRT} pxeldr1.o sio.o ashldi3.o
+pxeldr1.out: ${BTXCRT} pxeldr1.o sio.o ashldi3.o litepxe.o pxetramp.o
 	${LD} ${LD_FLAGS} --defsym ORG=${ORG2} --defsym ORG=${ORG2} -T ${LDSCRIPT} -o ${.TARGET} ${.ALLSRC}
 
-CLEANFILES+= pxeldr1.out sio.o
+CLEANFILES+= pxeldr1.out sio.o litepxe.o pxetramp.o
 
-SRCS=	pxeldr.S pxeldr1.c
+SRCS=	pxeldr.S pxeldr1.c litepxe.c pxetramp.S
 
 .include <bsd.prog.mk>
