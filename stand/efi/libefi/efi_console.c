@@ -1261,36 +1261,143 @@ keybuf_ischar(void)
 }
 
 /*
+ * Converts an EFI key shift state into a PC style modifer mask
+ */
+
+static char
+keybuf_kss2mod(uint32_t kss) {
+	char modifiers = 0;
+	
+	if (kss & EFI_RIGHT_SHIFT_PRESSED ||
+		kss & EFI_LEFT_SHIFT_PRESSED) {
+		modifiers |= 1;
+	}
+	
+	if (kss & EFI_RIGHT_ALT_PRESSED ||
+		kss & EFI_LEFT_ALT_PRESSED) {
+		modifiers |= 2;
+	}
+	
+	if (kss & EFI_RIGHT_CONTROL_PRESSED ||
+		kss & EFI_LEFT_CONTROL_PRESSED) {
+		modifiers |= 4;
+	}
+	
+	return '1' + modifiers;
+}
+
+/*
+ * Writes a VT220 style input escape to keybuf, with modifiers
+ */
+
+static void
+keybuf_insvt(const char keycode, uint32_t kss) {
+	int i = 0;
+	
+	keybuf[i++] = 0x1b; /* esc */
+	keybuf[i++] = '[';
+	keybuf[i++] = keycode;
+	
+	if (kss & EFI_SHIFT_STATE_VALID) {
+		keybuf[i++] = ';';
+		keybuf[i++] = keybuf_kss2mod(kss);
+	}
+	
+	keybuf[i++] = '~';
+}
+
+/*
+ * Writes a xtern style input escape to keybuf, with modifiers
+ */
+
+static void
+keybuf_insxterm(const char key, uint32_t kss) {
+	int i = 0;
+	
+	keybuf[i++] = 0x1b; /* esc */
+	keybuf[i++] = '[';
+	
+	if (kss & EFI_SHIFT_STATE_VALID) {
+		keybuf[i++] = '1';
+		keybuf[i++] = ';';
+		
+		keybuf[i++] = keybuf_kss2mod(kss);
+	}
+	
+	keybuf[i++] = key;
+}
+
+/*
  * We are not reading input before keybuf is empty, so we are safe
  * just to fill keybuf from the beginning.
  */
 static void
-keybuf_inschar(EFI_INPUT_KEY *key)
+keybuf_inschar(EFI_INPUT_KEY *key, uint32_t kss)
 {
-
+	if (kss & EFI_SHIFT_STATE_VALID) {
+		/*
+		* quick mapping to control chars, replace with
+		* map lookup later.
+		*/
+		if (kss & EFI_RIGHT_CONTROL_PRESSED ||
+			kss & EFI_LEFT_CONTROL_PRESSED) {
+			if (key->UnicodeChar >= 'a' &&
+				key->UnicodeChar <= 'z') {
+				key->UnicodeChar -= 'a';
+				key->UnicodeChar++;
+			}
+		}
+		else if (kss & EFI_RIGHT_ALT_PRESSED ||
+			kss & EFI_LEFT_ALT_PRESSED) {
+			/*
+			 * alt+[a-z] to ESC [ char
+			 */
+			
+			keybuf[0] = 0x1b;	/* esc */
+			
+			if (key->UnicodeChar >= 'a' &&
+				key->UnicodeChar <= 'z') {
+				keybuf[1] = key->UnicodeChar;
+				
+				return;
+			}
+		}
+	}
+	
 	switch (key->ScanCode) {
 	case SCAN_UP: /* UP */
-		keybuf[0] = 0x1b;	/* esc */
-		keybuf[1] = '[';
-		keybuf[2] = 'A';
+		keybuf_insxterm('A', kss);
 		break;
 	case SCAN_DOWN: /* DOWN */
-		keybuf[0] = 0x1b;	/* esc */
-		keybuf[1] = '[';
-		keybuf[2] = 'B';
+		keybuf_insxterm('B', kss);
 		break;
 	case SCAN_RIGHT: /* RIGHT */
-		keybuf[0] = 0x1b;	/* esc */
-		keybuf[1] = '[';
-		keybuf[2] = 'C';
+		keybuf_insxterm('C', kss);
 		break;
 	case SCAN_LEFT: /* LEFT */
-		keybuf[0] = 0x1b;	/* esc */
-		keybuf[1] = '[';
-		keybuf[2] = 'D';
+		keybuf_insxterm('D', kss);
+		break;
+	case SCAN_HOME: /* HOME */
+		keybuf_insxterm('H', kss);
+		break;
+	case SCAN_END: /* END */
+		keybuf_insxterm('F', kss);
+		break;
+	case SCAN_INSERT:
+		/* 
+		 * Fall back on vt sequences, since xterm sequences don't
+		 * cover ins/del/pgup/pgdn
+		 */
+		keybuf_insvt('2', kss);
 		break;
 	case SCAN_DELETE:
-		keybuf[0] = CHAR_BACKSPACE;
+		keybuf_insvt('3', kss);
+		break;
+	case SCAN_PAGE_UP: /* PGUP */
+		keybuf_insvt('5', kss);
+		break;
+	case SCAN_PAGE_DOWN:
+		keybuf_insvt('6', kss);
 		break;
 	case SCAN_ESC:
 		keybuf[0] = 0x1b;	/* esc */
@@ -1309,7 +1416,12 @@ efi_readkey(void)
 
 	status = conin->ReadKeyStroke(conin, &key);
 	if (status == EFI_SUCCESS) {
-		keybuf_inschar(&key);
+		/* 
+		 * Without TEXT_INPUT_EX we don't know of any modifers,
+		 * but any input escapes should pass through, so even
+		 * over a serial console we'll still have workable input.
+		 */
+		keybuf_inschar(&key, 0);
 		return (true);
 	}
 	return (false);
@@ -1327,28 +1439,14 @@ efi_readkey_ex(void)
 	if (status == EFI_SUCCESS) {
 		kss = key_data.KeyState.KeyShiftState;
 		kp = &key_data.Key;
-		if (kss & EFI_SHIFT_STATE_VALID) {
-
-			/*
-			 * quick mapping to control chars, replace with
-			 * map lookup later.
-			 */
-			if (kss & EFI_RIGHT_CONTROL_PRESSED ||
-			    kss & EFI_LEFT_CONTROL_PRESSED) {
-				if (kp->UnicodeChar >= 'a' &&
-				    kp->UnicodeChar <= 'z') {
-					kp->UnicodeChar -= 'a';
-					kp->UnicodeChar++;
-				}
-			}
-		}
+		
 		/*
 		 * The shift state and/or toggle state may not be valid,
 		 * but we still can have ScanCode or UnicodeChar.
 		 */
 		if (kp->ScanCode == 0 && kp->UnicodeChar == 0)
 			return (false);
-		keybuf_inschar(kp);
+		keybuf_inschar(kp, kss);
 		return (true);
 	}
 	return (false);
