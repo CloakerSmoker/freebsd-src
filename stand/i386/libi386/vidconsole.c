@@ -1070,6 +1070,83 @@ vidc_putchar(int c)
 		vidc_biosputchar(c);
 }
 
+/*
+ * Converts BIOS keyboard flags into a PC style modifer mask
+ */
+
+static char
+keybuf_kss2mod(uint32_t kss) {
+	char modifiers = 0;
+	
+	if ((kss & 0x1) ||
+		(kss & 0x2)) {
+		/* left shift or right shift */
+		
+		modifiers |= 1;
+	}
+	
+	if (kss & 0x4) {
+		/* alt */
+		
+		modifiers |= 4;
+	}
+	
+	if (kss & 0x8) {
+		/* control */
+		
+		modifiers |= 2;
+	}
+	
+	return '1' + modifiers;
+}
+
+/*
+ * Writes a VT220 style input escape to keybuf, with modifiers
+ */
+
+static int
+keybuf_insvt(const char keycode, uint32_t kss) {
+	int i = 0;
+	
+	keybuf[i++] = '[';
+	keybuf[i++] = keycode;
+	
+	if ((kss & 0xf) != 0) {
+		/* ignore all BIOS keyboard flags besides shift/ctrl/alt */
+		
+		keybuf[i++] = ';';
+		keybuf[i++] = keybuf_kss2mod(kss);
+	}
+	
+	keybuf[i++] = '~';
+	
+	return 0x1b; /* esc */
+}
+
+/*
+ * Writes a xtern style input escape to keybuf, with modifiers
+ */
+
+static int
+keybuf_insxterm(const char key, uint32_t kss) {
+	int i = 0;
+	
+	keybuf[i++] = '[';
+	
+	if ((kss & 0xf) != 0) {
+		/* ignore all BIOS keyboard flags besides shift/ctrl/alt */
+		
+		keybuf[i++] = '1';
+		keybuf[i++] = ';';
+		
+		keybuf[i++] = keybuf_kss2mod(kss);
+	}
+	
+	keybuf[i++] = key;
+	
+	return 0x1b; /* esc */
+}
+
 static int
 vidc_getchar(void)
 {
@@ -1088,30 +1165,86 @@ vidc_getchar(void)
 		v86.addr = 0x16;
 		v86.eax = 0x0;
 		v86int();
-		if ((v86.eax & 0xff) != 0) {
-			return (v86.eax & 0xff);
-		}
+		
+		int key = v86.eax;
+		int character = key & 0xff;
+		
+		v86.ctl = 0;
+		v86.addr = 0x16;
+		v86.eax = 0x200;
+		v86int();
+		
+		int modifiers = v86.eax & 0xff;
 
-		/* extended keys */
-		switch (v86.eax & 0xff00) {
+		/* Check for extended keys
+		 *
+		 * Unfortunately int 16h,0 encodes special keys with
+		 * modifiers, so there's a special code for "alt+up" and so
+		 * on for every combination of key+modifers.
+		 *
+		 * There's no obvious pattern between the regular and modified
+		 * codes, so this just checks for each one and uses the
+		 * modifier state from int 16h,2
+		 */
+		
+		switch (key & 0xff00) {
 		case 0x4800:	/* up */
-			keybuf[0] = '[';
-			keybuf[1] = 'A';
-			return (0x1b);	/* esc */
+		case 0x4838:
+		case 0x8d00:
+		case 0x9800:
+			return keybuf_insxterm('A', modifiers);
 		case 0x4b00:	/* left */
-			keybuf[0] = '[';
-			keybuf[1] = 'D';
-			return (0x1b);	/* esc */
+		case 0x4b34:
+		case 0x7300:
+		case 0x9b00:
+			return keybuf_insxterm('D', modifiers);
 		case 0x4d00:	/* right */
-			keybuf[0] = '[';
-			keybuf[1] = 'C';
-			return (0x1b);	/* esc */
+		case 0x4d36:
+		case 0x7400:
+		case 0x9d00:
+			return keybuf_insxterm('C', modifiers);
 		case 0x5000:	/* down */
-			keybuf[0] = '[';
-			keybuf[1] = 'B';
-			return (0x1b);	/* esc */
+		case 0x5032:
+		case 0x9100:
+		case 0xA000:
+			return keybuf_insxterm('B', modifiers);
+		case 0x4700: /* home */
+		case 0x4737:
+		case 0x7700:
+		case 0x9700:
+			return keybuf_insxterm('H', modifiers);
+		case 0x4f00: /* end */
+		case 0x4f31:
+		case 0x7500:
+		case 0x9f00:
+			return keybuf_insxterm('F', modifiers);
+		case 0x5200: /* insert */
+		case 0x5230:
+		case 0x9200:
+		case 0xA200:
+			return keybuf_insvt('2', modifiers);
+		case 0x5300: /* delete */
+		case 0x532E:
+		case 0x9300:
+		case 0xA300:
+			return keybuf_insvt('3', modifiers);
+		case 0x4900: /* pgup */
+		case 0x4939:
+		case 0x8400:
+		case 0x9900:
+			return keybuf_insvt('5', modifiers);
+		case 0x5100:
+		case 0x5133:
+		case 0x7600:
+		case 0xA100:
+			return keybuf_insvt('6', modifiers);
 		default:
-			return (-1);
+			/*
+			 * int 16h,0 already converts ctrl+[a-z] to control
+			 * characters for us
+			 */
+			
+			return character;
 		}
 	} else {
 		return (-1);
