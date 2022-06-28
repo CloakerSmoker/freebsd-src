@@ -1086,13 +1086,13 @@ keybuf_kss2mod(uint32_t kss) {
 	}
 	
 	if (kss & 0x4) {
-		/* alt */
+		/* ctrl */
 		
 		modifiers |= 4;
 	}
 	
 	if (kss & 0x8) {
-		/* control */
+		/* alt */
 		
 		modifiers |= 2;
 	}
@@ -1147,6 +1147,103 @@ keybuf_insxterm(const char key, uint32_t kss) {
 	return 0x1b; /* esc */
 }
 
+/* Helpers to normalize BIOS scancodes
+ *
+ * Unfortunately the BIOS encodes modifiers into the scancode
+ * and alt even zeros out the ASCII code we get back as well,
+ * so to properly support alt+key we need a big lookup to convert
+ * the modified scancodes back into the "normal" ones, and then
+ * deal with just normal scancodes and modifiers.
+ *
+ * Additionally, special keys have seemingly random scancodes with
+ * no apparent relationship between normal/ctrl/alt versions, so
+ * we also need to remap those as well.
+ *
+ * The only pattern I've found is that the shifted scancodes are
+ * the same as the normal scancodes, only the embedded ASCII code
+ * changes.
+ */
+
+struct bios_scancode_remap {
+	union {
+		struct {
+			union {
+				unsigned char normal;
+				unsigned char shift;
+			};
+			
+			unsigned char ctrl;
+			unsigned char alt;
+		};
+		
+		unsigned char codes[3];
+	};
+	
+	char ascii;
+};
+
+static struct bios_scancode_remap bios_sc_map[] = {
+/*  normal ctrl  alt   ascii */
+	{0x1e, 0x1e, 0x1e, 'a'},
+	{0x30, 0x30, 0x30, 'b'},
+	{0x2e, 0x2e, 0x2e, 'c'},
+	{0x20, 0x20, 0x20, 'd'},
+	{0x12, 0x12, 0x12, 'e'},
+	{0x21, 0x21, 0x21, 'f'},
+	{0x22, 0x22, 0x22, 'g'},
+	{0x23, 0x23, 0x23, 'h'},
+	{0x17, 0x17, 0x17, 'i'},
+	{0x24, 0x24, 0x24, 'j'},
+	{0x25, 0x25, 0x25, 'k'},
+	{0x26, 0x26, 0x26, 'l'},
+	{0x32, 0x32, 0x32, 'm'},
+	{0x31, 0x31, 0x31, 'n'},
+	{0x18, 0x18, 0x18, 'o'},
+	{0x19, 0x19, 0x19, 'p'},
+	{0x10, 0x10, 0x10, 'q'},
+	{0x13, 0x13, 0x13, 'r'},
+	{0x1f, 0x1f, 0x1f, 's'},
+	{0x14, 0x14, 0x14, 't'},
+	{0x16, 0x16, 0x16, 'u'},
+	{0x2f, 0x2f, 0x2f, 'v'},
+	{0x11, 0x11, 0x11, 'w'},
+	{0x2d, 0x2d, 0x2d, 'x'},
+	{0x15, 0x15, 0x15, 'y'},
+	{0x2c, 0x2c, 0x2c, 'z'},
+	{0x02, 0xff, 0x78, '1'},
+	{0x03, 0x03, 0x79, '2'},
+	{0x04, 0xff, 0x7a, '3'},
+	{0x05, 0xff, 0x7b, '4'},
+	{0x06, 0xff, 0x7c, '5'},
+	{0x07, 0x07, 0x7d, '6'},
+	{0x08, 0xff, 0x7e, '7'},
+	{0x09, 0xff, 0x7f, '8'},
+	{0x0a, 0xff, 0x80, '9'},
+	{0x0b, 0xff, 0x81, '0'},
+	{0x0c, 0x0c, 0x82, '-'},
+	{0x0d, 0xff, 0x83, '='},
+	{0x1a, 0x1a, 0x1a, '['},
+	{0x1b, 0x1b, 0x1b, ']'},
+	{0x27, 0xff, 0x27, ';'},
+	{0x28, 0xff, 0xff, '\''}, 
+	{0x29, 0xff, 0xff, '`'}, 
+	{0x0e, 0x0e, 0x0e, 0x00}, /* backspace */
+	{0x53, 0x93, 0xa3, 0x00}, /* del */
+	{0x50, 0x91, 0xa0, 0x00}, /* down */
+	{0x4f, 0x75, 0x9f, 0x00}, /* end */
+	{0x1c, 0x1c, 0xa6, 0x0a}, /* enter */
+	{0x01, 0x01, 0x01, 0x00}, /* esc */
+	{0x47, 0x77, 0x97, 0x00}, /* home */
+	{0x52, 0x92, 0xa2, 0x00}, /* ins */
+	{0x4b, 0x73, 0x9b, 0x00}, /* left */
+	{0x51, 0x76, 0xa1, 0x00}, /* pgdn */
+	{0x49, 0x84, 0x99, 0x00}, /* pgup */
+	{0x4d, 0x74, 0x9d, 0x00}, /* right */
+	{0x39, 0x39, 0x39, ' '}, /* spacebar */
+	{0x0f, 0x94, 0xa5, '\t'}, /* tab */
+	{0x48, 0x8d, 0x98, 0x00}, /* up */
+};
+
 static int
 vidc_getchar(void)
 {
@@ -1166,8 +1263,8 @@ vidc_getchar(void)
 		v86.eax = 0x0;
 		v86int();
 		
-		int key = v86.eax;
-		int character = key & 0xff;
+		int scancode = (v86.eax & 0xff00) >> 8;
+		int character = v86.eax & 0xff;
 		
 		v86.ctl = 0;
 		v86.addr = 0x16;
@@ -1175,74 +1272,61 @@ vidc_getchar(void)
 		v86int();
 		
 		int modifiers = v86.eax & 0xff;
-
-		/* Check for extended keys
-		 *
-		 * Unfortunately int 16h,0 encodes special keys with
-		 * modifiers, so there's a special code for "alt+up" and so
-		 * on for every combination of key+modifers.
-		 *
-		 * There's no obvious pattern between the regular and modified
-		 * codes, so this just checks for each one and uses the
-		 * modifier state from int 16h,2
-		 */
 		
-		switch (key & 0xff00) {
-		case 0x4800:	/* up */
-		case 0x4838:
-		case 0x8d00:
-		case 0x9800:
+		int len = sizeof(bios_sc_map) / sizeof(bios_sc_map[0]);
+		
+		for (int i = 0; i < len; i++) {
+			struct bios_scancode_remap* map = &bios_sc_map[i];
+			
+			for (int c = 0; c < 3; c++) {
+				if (map->codes[c] == scancode) {
+					scancode = map->normal;
+					
+					if (character == 0) {
+						/* 
+						 * preserve character from BIOS so we don't
+						 * have to manually handle shift/control
+						 */
+						
+						character = map->ascii;
+					}
+					
+					break;
+				}
+			}
+		}
+		
+		switch (scancode) {
+		case 0x48:	/* up */
 			return keybuf_insxterm('A', modifiers);
-		case 0x4b00:	/* left */
-		case 0x4b34:
-		case 0x7300:
-		case 0x9b00:
+		case 0x4b:	/* left */
 			return keybuf_insxterm('D', modifiers);
-		case 0x4d00:	/* right */
-		case 0x4d36:
-		case 0x7400:
-		case 0x9d00:
+		case 0x4d:	/* right */
 			return keybuf_insxterm('C', modifiers);
-		case 0x5000:	/* down */
-		case 0x5032:
-		case 0x9100:
-		case 0xA000:
+		case 0x50:	/* down */
 			return keybuf_insxterm('B', modifiers);
-		case 0x4700: /* home */
-		case 0x4737:
-		case 0x7700:
-		case 0x9700:
+		case 0x47: /* home */
 			return keybuf_insxterm('H', modifiers);
-		case 0x4f00: /* end */
-		case 0x4f31:
-		case 0x7500:
-		case 0x9f00:
+		case 0x4f: /* end */
 			return keybuf_insxterm('F', modifiers);
-		case 0x5200: /* insert */
-		case 0x5230:
-		case 0x9200:
-		case 0xA200:
+		case 0x52: /* insert */
 			return keybuf_insvt('2', modifiers);
-		case 0x5300: /* delete */
-		case 0x532E:
-		case 0x9300:
-		case 0xA300:
+		case 0x53: /* delete */
 			return keybuf_insvt('3', modifiers);
-		case 0x4900: /* pgup */
-		case 0x4939:
-		case 0x8400:
-		case 0x9900:
+		case 0x49: /* pgup */
 			return keybuf_insvt('5', modifiers);
-		case 0x5100:
-		case 0x5133:
-		case 0x7600:
-		case 0xA100:
+		case 0x51: /* pgdn */
 			return keybuf_insvt('6', modifiers);
 		default:
-			/*
-			 * int 16h,0 already converts ctrl+[a-z] to control
-			 * characters for us
-			 */
+			if (modifiers & 0x8) {
+				/* alt */
+				
+				if (('a' <= character) && (character <= 'z')) {
+					keybuf[0] = character;
+					
+					return (0x1b); /* esc */
+				}
+			}
 			
 			return character;
 		}
