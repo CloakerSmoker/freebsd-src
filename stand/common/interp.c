@@ -39,7 +39,118 @@ __FBSDID("$FreeBSD$");
 
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
-const char * volatile	interp_identifier;
+struct interact_input {
+	char mods;
+	char key;
+};
+
+char interact_esc_state;
+char interact_mods_or_code;
+char interact_char_or_mods;
+
+#define INTERP_MOD_SHIFT 1
+#define INTERP_MOD_ALT 2
+#define INTERP_MOD_CTRL 4
+
+static void interact_unshift(struct interact_input* result, char in)
+{
+	if ('A' <= in && in <= 'Z')
+	{
+		result->mods |= INTERP_MOD_SHIFT;
+		in ^= 0x20;
+	}
+	
+	result->key = in;
+}
+
+#define INTERP_ANSI_TO_KEY 0x80
+#define INTERP_KEY_UP (INTERP_ANSI_TO_KEY + 'A')
+#define INTERP_KEY_DOWN (INTERP_ANSI_TO_KEY + 'B')
+#define INTERP_KEY_RIGHT (INTERP_ANSI_TO_KEY + 'C')
+#define INTERP_KEY_LEFT (INTERP_ANSI_TO_KEY + 'D')
+#define INTERP_KEY_END (INTERP_ANSI_TO_KEY + 'F')
+#define INTERP_KEY_HOME (INTERP_ANSI_TO_KEY + 'H')
+
+#define INTERP_KEY_INSERT (INTERP_ANSI_TO_KEY + 'E')
+#define INTERP_KEY_DELETE (INTERP_ANSI_TO_KEY + 'I')
+
+#define INTERP_KEY_PGUP (INTERP_ANSI_TO_KEY + 'J')
+#define INTERP_KEY_PGDN (INTERP_ANSI_TO_KEY + 'K')
+
+static char interact_vt[] = {
+	INTERP_KEY_HOME, INTERP_KEY_INSERT, INTERP_KEY_DELETE, INTERP_KEY_END,
+	INTERP_KEY_PGUP, INTERP_KEY_PGDN, INTERP_KEY_HOME, INTERP_KEY_END
+};
+
+static struct interact_input
+interact_parse_input(char next)
+{
+	struct interact_input result = { 0 };
+	
+	switch (interact_esc_state) {
+		case 0:
+			if (next == 0x1b)
+				interact_esc_state = next;
+			else if (next <= 0x27 && next != )
+			{
+				result.key = next - 1 + 'a';
+				result.mods |= INTERP_MOD_CTRL;
+			}
+			else
+				interact_unshift(&result, next);
+			break;
+		case 0x1b:
+			if (next == '[')
+				interact_esc_state = '[';
+			else 
+			{
+				result.mods |= INTERP_MOD_ALT;
+				interact_unshift(&result, next);
+				interact_esc_state = 0;
+			}
+			break;
+		case '[':
+			if ('A' <= next && next <= 'Z')
+			{
+				result.key = INTERP_ANSI_TO_KEY + next;
+				interact_esc_state = 0;
+			}
+			else if ('1' <= next && next <= '9')
+			{
+				interact_esc_state = '1';
+				interact_mods_or_code = next;
+			}
+			else 
+			{
+				result.mods |= INTERP_MOD_ALT;
+				interact_unshift(&result, next);
+				interact_esc_state = 0;
+			}
+		case '1': {
+			if (next == ';')
+				interact_esc_state = '2';
+			else if (next == '~')
+			{
+				interact_mods_or_code -= '1';
+				
+				if (interact_mods_or_code < 8)
+					result.key = interact_vt[(int)interact_mods_or_code];
+				
+				interact_esc_state = 0;
+			}
+			else 
+			{
+				result.mods = interact_mods_or_code - '0' - 1;
+				
+				interact_unshift(&result, next);
+				
+				interact_esc_state = 0;
+			}
+		}
+	}
+	
+	return result;
+}
 
 /*
  * Interactive mode
@@ -81,7 +192,20 @@ interact(void)
 		input[0] = '\0';
 		interp_emit_prompt();
 		ngets(input, sizeof(input));
-		interp_run(input);
+		
+		printf("\n");
+		
+		for (int index = 0; index < sizeof(input); index++) {
+			char n = getchar();
+			
+			struct interact_input i = interact_parse_input(n);
+			
+			if (i.key != 0) {
+				printf("(%x %x) ", i.mods, i.key);
+			}
+		}
+		
+		//interp_run(input);
 	}
 }
 
