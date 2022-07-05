@@ -1261,7 +1261,7 @@ keybuf_ischar(void)
 }
 
 /*
- * Converts an EFI key shift state into a PC style modifer mask
+ * Converts an EFI key shift state into a PC style modifier mask
  */
 
 static char
@@ -1307,7 +1307,7 @@ keybuf_insvt(const char keycode, uint32_t kss) {
 }
 
 /*
- * Writes a xtern style input escape to keybuf, with modifiers
+ * Writes a xterm style input escape to keybuf, with modifiers
  */
 
 static void
@@ -1350,7 +1350,7 @@ keybuf_inschar(EFI_INPUT_KEY *key, uint32_t kss)
 		else if (kss & EFI_RIGHT_ALT_PRESSED ||
 			kss & EFI_LEFT_ALT_PRESSED) {
 			/*
-			 * alt+[a-z] to ESC [ char
+			 * alt+[a-z] to esc
 			 */
 			
 			keybuf[0] = 0x1b;	/* esc */
@@ -1393,14 +1393,14 @@ keybuf_inschar(EFI_INPUT_KEY *key, uint32_t kss)
 	case SCAN_DELETE:
 		keybuf_insvt('3', kss);
 		break;
-	case SCAN_PAGE_UP: /* PGUP */
+	case SCAN_PAGE_UP:
 		keybuf_insvt('5', kss);
 		break;
 	case SCAN_PAGE_DOWN:
 		keybuf_insvt('6', kss);
 		break;
 	case SCAN_ESC:
-		keybuf[0] = 0x1b;	/* esc */
+		keybuf[0] = 0x1b; /* esc */
 		break;
 	default:
 		keybuf[0] = key->UnicodeChar;
