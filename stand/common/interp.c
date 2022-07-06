@@ -52,6 +52,7 @@ enum {
 	esc_code_mods,
 	esc_code_mods_end
 } interact_esc_state;
+
 char interact_mods_or_code;
 char interact_char_or_mods;
 
@@ -182,6 +183,25 @@ interact_parse_input(char next)
 	return result;
 }
 
+static char
+interact_input_to_char(struct interact_input input)
+{
+	if (input.key > 0)
+	{
+		if (input.mods & INTERP_MOD_SHIFT)
+		{
+			if ('a' <= input.key && input.key <= 'z')
+				return input.key ^ 0x20;
+		}
+		else if (input.mods)
+			return 0;
+		
+		return input.key;
+	}
+	
+	return 0;
+}
+
 /*
  * Interactive mode
  */
@@ -232,22 +252,25 @@ interact(void)
 		for (;;) {
 			char n = getchar();
 			
-			//printf("[%x %c %i] ", n, n, interact_esc_state);
+			printf("[%x %c %i] ", n, n, interact_esc_state);
 			
 			struct interact_input i = interact_parse_input(n);
+			char in = interact_input_to_char(i);
 			
-			if (i.key > 0) {
-				if (i.key == 0xd)
-				{
-					printf("\n");
-					break;
-				}
+			if (i.key == 0xd)
+			{
+				printf("\n");
+				break;
+			}
+			else if (i.key > 0)
+			{
+				printf("(%x %x) ", i.mods, i.key);
+			}
+			else if (in != 0)
+			{
+				input[input_index++] = in;
 				
-				input[input_index++] = i.key;
-				
-				printf("%c", i.key);
-				
-				//printf("(%x %x) ", i.mods, i.key);
+				//printf("%c", in);
 			}
 		}
 		
