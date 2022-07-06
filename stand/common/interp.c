@@ -44,7 +44,14 @@ struct interact_input {
 	char key;
 };
 
-char interact_esc_state;
+enum {
+	esc_normal, 
+	esc_esc, 
+	esc_bracket,
+	esc_bracket_either,
+	esc_code_mods,
+	esc_code_mods_end
+} interact_esc_state;
 char interact_mods_or_code;
 char interact_char_or_mods;
 
@@ -88,10 +95,10 @@ interact_parse_input(char next)
 	struct interact_input result = { 0 };
 	
 	switch (interact_esc_state) {
-		case 0:
+		case esc_normal:
 			if (next == 0x1b)
-				interact_esc_state = next;
-			else if (next <= 0x27 && next != )
+				interact_esc_state = esc_esc;
+			else if (next <= 0x27 && next != 0x8 && next != 0x9 && next != 0xd)
 			{
 				result.key = next - 1 + 'a';
 				result.mods |= INTERP_MOD_CTRL;
@@ -99,36 +106,37 @@ interact_parse_input(char next)
 			else
 				interact_unshift(&result, next);
 			break;
-		case 0x1b:
+		case esc_esc:
 			if (next == '[')
-				interact_esc_state = '[';
+				interact_esc_state = esc_bracket;
 			else 
 			{
 				result.mods |= INTERP_MOD_ALT;
 				interact_unshift(&result, next);
-				interact_esc_state = 0;
+				interact_esc_state = esc_normal;
 			}
 			break;
-		case '[':
+		case esc_bracket:
 			if ('A' <= next && next <= 'Z')
 			{
 				result.key = INTERP_ANSI_TO_KEY + next;
-				interact_esc_state = 0;
+				interact_esc_state = esc_normal;
 			}
 			else if ('1' <= next && next <= '9')
 			{
-				interact_esc_state = '1';
+				interact_esc_state = esc_bracket_either;
 				interact_mods_or_code = next;
 			}
 			else 
 			{
 				result.mods |= INTERP_MOD_ALT;
 				interact_unshift(&result, next);
-				interact_esc_state = 0;
+				interact_esc_state = esc_normal;
 			}
-		case '1': {
+			break;
+		case esc_bracket_either:
 			if (next == ';')
-				interact_esc_state = '2';
+				interact_esc_state = esc_code_mods;
 			else if (next == '~')
 			{
 				interact_mods_or_code -= '1';
@@ -136,7 +144,7 @@ interact_parse_input(char next)
 				if (interact_mods_or_code < 8)
 					result.key = interact_vt[(int)interact_mods_or_code];
 				
-				interact_esc_state = 0;
+				interact_esc_state = esc_normal;
 			}
 			else 
 			{
@@ -144,9 +152,31 @@ interact_parse_input(char next)
 				
 				interact_unshift(&result, next);
 				
-				interact_esc_state = 0;
+				interact_esc_state = esc_normal;
 			}
-		}
+			break;
+		case esc_code_mods:
+			interact_char_or_mods = next;
+			interact_esc_state = esc_code_mods_end;
+			break;
+		case esc_code_mods_end:
+			result.mods = interact_char_or_mods - '0' - 1;
+			
+			if (next == '~')
+			{
+				interact_mods_or_code -= '1';
+				
+				if (interact_mods_or_code < 8)
+					result.key = interact_vt[(int)interact_mods_or_code];
+			}
+			else if (interact_mods_or_code == '1' && ('A' <= next && next <= 'Z'))
+			{
+				result.key = INTERP_ANSI_TO_KEY + next;
+			}
+			
+			interact_esc_state = esc_normal;
+			
+			break;
 	}
 	
 	return result;
@@ -159,6 +189,11 @@ void
 interact(void)
 {
 	static char		input[256];		/* big enough? */
+<<<<<<< HEAD
+=======
+	const char * volatile	interp_identifier;
+	int input_index;
+>>>>>>> 900d6b9cd57e (stand/common: parse more complex input escapes)
 
 	TSENTER();
 
@@ -189,23 +224,35 @@ interact(void)
 		setenv("interpret", "OK", 1);
 
 	for (;;) {
-		input[0] = '\0';
+		input_index = 0;
 		interp_emit_prompt();
-		ngets(input, sizeof(input));
 		
-		printf("\n");
+		//printf("\n");
 		
-		for (int index = 0; index < sizeof(input); index++) {
+		for (;;) {
 			char n = getchar();
+			
+			//printf("[%x %c %i] ", n, n, interact_esc_state);
 			
 			struct interact_input i = interact_parse_input(n);
 			
-			if (i.key != 0) {
-				printf("(%x %x) ", i.mods, i.key);
+			if (i.key > 0) {
+				if (i.key == 0xd)
+				{
+					printf("\n");
+					break;
+				}
+				
+				input[input_index++] = i.key;
+				
+				printf("%c", i.key);
+				
+				//printf("(%x %x) ", i.mods, i.key);
 			}
 		}
 		
-		//interp_run(input);
+		input[input_index] = '\0';
+		interp_run(input);
 	}
 }
 
