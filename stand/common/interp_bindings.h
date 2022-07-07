@@ -20,6 +20,14 @@ struct interact_keybind {
 	STAILQ_ENTRY(interact_keybind) next;
 };
 
+struct interact_predefined_action {
+	char* name;
+	interact_action action;
+	void* parameter;
+	
+	STAILQ_ENTRY(interact_predefined_action) next;
+};
+
 #define INTERP_MOD_SHIFT 1
 #define INTERP_MOD_ALT 2
 #define INTERP_MOD_CTRL 4
@@ -44,3 +52,6 @@ char interact_input_to_char(struct interact_input input);
 char interact_on_input(char);
 
 struct interact_keybind* interact_add_binding(char, char, interact_action, void*);
+void interact_print_stroke(struct interact_input);
+struct interact_input interact_parse_stroke(char*);
+struct interact_predefined_action* interact_register_action(char*, interact_action, void*);
