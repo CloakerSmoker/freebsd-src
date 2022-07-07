@@ -219,7 +219,9 @@ interact(void)
 		setenv("prompt", "${interpret}", 1);
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
-
+	
+	interact_register_action("backspace", interact_line_backspace, &buffer);
+	
 	for (;;) {
 		input_index = 0;
 		interp_emit_prompt();

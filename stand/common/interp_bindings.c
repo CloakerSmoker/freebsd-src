@@ -18,7 +18,7 @@ enum {
 static char interact_mods_or_code;
 static char interact_char_or_mods;
 
-static void interact_unshift(struct interact_input* result, char in)
+static void unshift(struct interact_input* result, char in)
 {
 	if ('A' <= in && in <= 'Z')
 	{
@@ -43,13 +43,13 @@ interact_parse_input(char next)
 		case esc_normal:
 			if (next == 0x1b)
 				interact_esc_state = esc_esc;
-			else if (next <= 0x27 && next != 0x8 && next != 0x9 && next != 0xd)
+			else if (next <= 0x1f && next != 0x8 && next != 0x9 && next != 0xd)
 			{
 				result.key = next - 1 + 'a';
 				result.mods |= INTERP_MOD_CTRL;
 			}
 			else
-				interact_unshift(&result, next);
+				unshift(&result, next);
 			break;
 		case esc_esc:
 			if (next == '[')
@@ -57,7 +57,7 @@ interact_parse_input(char next)
 			else 
 			{
 				result.mods |= INTERP_MOD_ALT;
-				interact_unshift(&result, next);
+				unshift(&result, next);
 				interact_esc_state = esc_normal;
 			}
 			break;
@@ -75,7 +75,7 @@ interact_parse_input(char next)
 			else 
 			{
 				result.mods |= INTERP_MOD_ALT;
-				interact_unshift(&result, next);
+				unshift(&result, next);
 				interact_esc_state = esc_normal;
 			}
 			break;
@@ -95,7 +95,7 @@ interact_parse_input(char next)
 			{
 				result.mods = interact_mods_or_code - '0' - 1;
 				
-				interact_unshift(&result, next);
+				unshift(&result, next);
 				
 				interact_esc_state = esc_normal;
 			}
@@ -149,7 +149,7 @@ interact_input_to_char(struct interact_input input)
 STAILQ_HEAD(interact_binds, interact_keybind) interact_binds_head =
 	 STAILQ_HEAD_INITIALIZER(interact_binds_head);
 
-static struct interact_keybind* interact_find_binding(char mods, char key)
+static struct interact_keybind* find_binding(char mods, char key)
 {
 	struct interact_keybind* p;
 	
@@ -163,7 +163,7 @@ static struct interact_keybind* interact_find_binding(char mods, char key)
 
 struct interact_keybind* interact_add_binding(char mods, char key, interact_action action, void* parameter)
 {
-	struct interact_keybind* result = interact_find_binding(mods, key);
+	struct interact_keybind* result = find_binding(mods, key);
 	
 	if (result == NULL)
 		result = malloc(sizeof(struct interact_keybind));
@@ -182,7 +182,7 @@ char interact_on_input(char in)
 {
 	struct interact_input input = interact_parse_input(in);
 	
-	struct interact_keybind* binding = interact_find_binding(input.mods, input.key);
+	struct interact_keybind* binding = find_binding(input.mods, input.key);
 	
 	if (binding != NULL)
 	{
@@ -190,4 +190,222 @@ char interact_on_input(char in)
 	}
 	
 	return interact_input_to_char(input);
+}
+
+struct keyname_map {
+	char* name;
+	char key;
+};
+
+static struct keyname_map emacs_shortname_to_key[] = {
+	{"BS", 0x8},
+	{"TAB", 0x9},
+	{"RET", 0x0a},
+	{"ESC", 0x1b},
+	{"SPC", 0x20},
+	{"DEL", 0x7f},
+	{0, 0}
+};
+
+static struct keyname_map emacs_longname_to_key[] = {
+	{"<left>", INTERP_KEY_LEFT},
+	{"<up>", INTERP_KEY_UP},
+	{"<right>", INTERP_KEY_RIGHT},
+	{"<down>", INTERP_KEY_DOWN},
+	{"<end>", INTERP_KEY_END},
+	{"<home>", INTERP_KEY_HOME},
+	{"<insert>", INTERP_KEY_INSERT},
+	{"<delete>", INTERP_KEY_DELETE},
+	{"<prior>", INTERP_KEY_PGUP},
+	{"<next>", INTERP_KEY_PGDN},
+	{0, 0}
+};
+
+static char lookup_key_from_name(struct keyname_map* map, char* name)
+{
+	int i = 0;
+	
+	while (map[i].key != 0) {
+		if (strcmp(map[i].name, name) == 0)
+			return map[i].key;
+		
+		i += 1;
+	}
+	
+	return 0;
+}
+static char* lookup_name_from_key(struct keyname_map* map, char key)
+{
+	int i = 0;
+	
+	while (map[i].key != 0) {
+		if (map[i].key == key)
+			return map[i].name;;
+		
+		i += 1;
+	}
+	
+	return 0;
+}
+
+void interact_print_stroke(struct interact_input stroke)
+{
+	if (stroke.mods)
+	{
+		if (stroke.mods & INTERP_MOD_ALT) {
+			printf("M-");
+		}
+		
+		if (stroke.mods & INTERP_MOD_CTRL) {
+			printf("C-");
+		}
+		
+		if (stroke.mods & INTERP_MOD_SHIFT) {
+			printf("S-");
+		}
+	}
+	
+	if (0 <= stroke.key && stroke.key <= 0x20) {
+		char* name = lookup_name_from_key(emacs_shortname_to_key, stroke.key);
+		
+		if (name) {
+			printf("%s", name);
+		}
+		else {
+			printf("\\x%x", stroke.key);
+		}
+	}
+	else if (0x20 <= stroke.key && stroke.key <= 0x126) {
+		printf("%c", stroke.key);
+	}
+	else {
+		char* name = lookup_name_from_key(emacs_longname_to_key, stroke.key);
+		
+		if (name) {
+			printf("%s", name);
+		}
+		else {
+			printf("\\x%x", stroke.key);
+		}
+	}
+}
+
+struct interact_input interact_parse_stroke(char* stroke)
+{
+	struct interact_input result = { 0 };
+	
+	int len = strlen(stroke);
+	char* p = stroke;
+	
+	while (len >= 3 && p[1] == '-')
+	{
+		switch (*p)
+		{
+			case 'C':
+				result.mods |= INTERP_MOD_CTRL;
+				break;
+			case 'M':
+				result.mods |= INTERP_MOD_ALT;
+				break;
+			case 'S':
+				result.mods |= INTERP_MOD_SHIFT;
+				break;
+		}
+		
+		p += 2;
+		len -= 2;
+	}
+	
+	if (len != 1)
+	{
+		if (p[0] == '<')
+		{
+			result.key = lookup_key_from_name(emacs_longname_to_key, p);
+		}
+		else
+		{
+			result.key = lookup_key_from_name(emacs_shortname_to_key, p);
+		}
+	}
+	else
+	{
+		char ascii = *p;
+		
+		if ('A' <= ascii && ascii <= 'Z')
+		{
+			result.mods |= INTERP_MOD_SHIFT;
+			ascii ^= 0x20;
+		}
+		
+		result.key = ascii;
+	}
+	
+	return result;
+}
+
+struct interact_keybind* interact_add_stroke_binding(char* stroke, interact_action action, void* parameter)
+{
+	struct interact_input input = interact_parse_stroke(stroke);
+	
+	return interact_add_binding(input.mods, input.key, action, parameter);
+}
+
+STAILQ_HEAD(interact_actions, interact_predefined_action) interact_actions_head =
+	 STAILQ_HEAD_INITIALIZER(interact_actions_head);
+
+struct interact_predefined_action* interact_register_action(char* name, interact_action action, void* parameter)
+{
+	struct interact_predefined_action* result = malloc(sizeof(struct interact_predefined_action));
+	
+	result->name = name;
+	result->action = action;
+	result->parameter = parameter;
+	
+	STAILQ_INSERT_TAIL(&interact_actions_head, result, next);
+	
+	return result;
+}
+
+static struct interact_predefined_action* find_action(char* name)
+{
+	struct interact_predefined_action* p;
+	
+	STAILQ_FOREACH(p, &interact_actions_head, next) {
+		if (strcmp(p->name, name) == 0)
+			return p;
+	}
+	
+	return NULL;
+}
+
+struct interact_keybind* interact_add_stroke_action_binding(char* stroke, char* action_name)
+{
+	struct interact_predefined_action* predef = find_action(action_name);
+	
+	if (predef == NULL)
+		return NULL;
+	
+	return interact_add_stroke_binding(stroke, predef->action, predef->parameter);
+}
+
+COMMAND_SET(keybind, "keybind", "bind a key to an action", command_keybind);
+
+static int
+command_keybind(int argc, char *argv[])
+{
+	if (argc != 3)
+		return 1;
+	
+	struct interact_keybind* bind = interact_add_stroke_action_binding(argv[1], argv[2]);
+	
+	if (bind != NULL) {
+		printf("Bound ");
+		interact_print_stroke(bind->target);
+		printf(" to %s\n", argv[2]);
+	}
+	else {
+		printf("Could not bind '%s' to %s\n", argv[1], argv[2]);
+	}
+
+	return (bind == NULL);
 }
