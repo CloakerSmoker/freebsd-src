@@ -51,7 +51,11 @@ char interact_input_to_char(struct interact_input input);
 
 char interact_on_input(char);
 
+struct interact_keybind* interact_find_binding(char, char);
+struct interact_keybind* interact_add_binding_raw(int, char, char, interact_action, void*);
 struct interact_keybind* interact_add_binding(char, char, interact_action, void*);
+void interact_remove_binding(struct interact_keybind*);
+
 void interact_print_stroke(struct interact_input);
-struct interact_input interact_parse_stroke(char*);
+struct interact_input interact_parse_stroke(const char*);
 struct interact_predefined_action* interact_register_action(char*, interact_action, void*);

@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <lfs.h>
 #include <lutils.h>
 
+#include "interp_bindings.h"
+
 struct interp_lua_softc {
 	lua_State	*luap;
 };
@@ -75,6 +77,136 @@ interp_lua_realloc(void *ud __unused, void *ptr, size_t osize __unused, size_t n
 	return realloc(ptr, nsize);
 }
 
+struct lua_keybind {
+	struct interact_keybind bind;
+	int callback_ref;
+};
+
+static char lua_keybind_handler(struct interact_keybind* bind)
+{
+	struct lua_keybind* luabind = (struct lua_keybind*)bind;
+	lua_State *L = bind->parameter;
+	
+	lua_rawgeti(L, LUA_REGISTRYINDEX, luabind->callback_ref);
+	
+	lua_pcall(L, 0, 0, 0);
+	
+	return 0;
+}
+
+static int
+lua_keybind_register(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 2) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	if (!lua_isstring(L, -2)) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	const char* stroke = lua_tostring(L, -2);
+	struct interact_input input = interact_parse_stroke(stroke);
+	
+	if (input.key == 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	struct interact_keybind* bind = interact_add_binding_raw(4, input.mods, input.key, lua_keybind_handler, L);
+	struct lua_keybind* luabind = (struct lua_keybind*)bind;
+	
+	luabind->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	
+	lua_pushlightuserdata(L, luabind);
+	return 1;
+}
+
+static int
+lua_keybind_delete(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 1) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	if (!lua_islightuserdata(L, -1)) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	struct interact_keybind* bind = (struct interact_keybind*)lua_touserdata(L, -1);
+	
+	if (bind->action == lua_keybind_handler) {
+		struct lua_keybind* luabind = (struct lua_keybind*)bind;
+		
+		luaL_unref(L, LUA_REGISTRYINDEX, luabind->callback_ref);
+	}
+	
+	interact_remove_binding(bind);
+	
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
+lua_keybind_find(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 1) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	if (!lua_isstring(L, -1)) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	const char* stroke = lua_tostring(L, -1);
+	struct interact_input input = interact_parse_stroke(stroke);
+	
+	if (input.key == 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	struct interact_keybind* bind = interact_find_binding(input.mods, input.key);
+	
+	if (bind == NULL) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	lua_pushlightuserdata(L, bind);
+	return 1;
+}
+
+static const struct luaL_Reg keybindlib[] = {
+	{"register", lua_keybind_register},
+	{"delete", lua_keybind_delete},
+	{"find", lua_keybind_find},
+	{NULL, NULL}
+};
+
+int
+luaopen_keybind(lua_State *L)
+{
+	luaL_newlib(L, keybindlib);
+	
+	lua_newtable(L);
+	lua_setfield(L, -2, "registered");
+	
+	return 1;
+}
+
 /*
  * The libraries commented out below either lack the proper
  * support from libsa, or they are unlikely to be useful
@@ -96,6 +228,7 @@ static const luaL_Reg loadedlibs[] = {
   {"lfs", luaopen_lfs},
   {"loader", luaopen_loader},
   {"pager", luaopen_pager},
+  {"keybind", luaopen_keybind},
   {NULL, NULL}
 };
 
