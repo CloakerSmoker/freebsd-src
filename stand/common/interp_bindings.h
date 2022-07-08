@@ -58,4 +58,7 @@ void interact_remove_binding(struct interact_keybind*);
 
 void interact_print_stroke(struct interact_input);
 struct interact_input interact_parse_stroke(const char*);
+
+struct interact_predefined_action* interact_first_action();
+struct interact_predefined_action* interact_next_action(struct interact_predefined_action*);
 struct interact_predefined_action* interact_register_action(char*, interact_action, void*);

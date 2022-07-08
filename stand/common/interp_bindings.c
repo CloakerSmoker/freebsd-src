@@ -164,8 +164,9 @@ struct interact_keybind* interact_find_binding(char mods, char key)
 struct interact_keybind* interact_add_binding_raw(int extraspace, char mods, char key, interact_action action, void* parameter)
 {
 	struct interact_keybind* result = interact_find_binding(mods, key);
+	int new = result == NULL;
 	
-	if (result == NULL)
+	if (new)
 		result = malloc(sizeof(struct interact_keybind) + extraspace);
 	
 	result->target.mods = mods;
@@ -173,7 +174,8 @@ struct interact_keybind* interact_add_binding_raw(int extraspace, char mods, cha
 	result->action = action;
 	result->parameter = parameter;
 	
-	STAILQ_INSERT_TAIL(&interact_binds_head, result, next);
+	if (new)
+		STAILQ_INSERT_TAIL(&interact_binds_head, result, next);
 	
 	return result;
 }
@@ -365,6 +367,16 @@ struct interact_keybind* interact_add_stroke_binding(char* stroke, interact_acti
 STAILQ_HEAD(interact_actions, interact_predefined_action) interact_actions_head =
 	 STAILQ_HEAD_INITIALIZER(interact_actions_head);
 
+struct interact_predefined_action* interact_first_action()
+{
+	return STAILQ_FIRST(&interact_actions_head);
+}
+
+struct interact_predefined_action* interact_next_action(struct interact_predefined_action* current)
+{
+	return STAILQ_NEXT(current, next);
+}
+
 struct interact_predefined_action* interact_register_action(char* name, interact_action action, void* parameter)
 {
 	struct interact_predefined_action* result = malloc(sizeof(struct interact_predefined_action));
@@ -416,7 +428,7 @@ command_keybind(int argc, char *argv[])
 		printf(" to %s\n", argv[2]);
 	}
 	else {
-		printf("Could not bind '%s' to %s\n", argv[1], argv[2]);
+		printf("Could not bind '%s' to '%s'\n", argv[1], argv[2]);
 	}
 
 	return (bind == NULL);

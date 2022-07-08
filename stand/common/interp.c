@@ -37,57 +37,12 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "bootstrap.h"
 
+#include "interp_bindings.h"
+#include "interp_editing.h"
+
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
-struct interact_input {
-	char mods;
-	char key;
-};
-
-enum {
-	esc_normal, 
-	esc_esc, 
-	esc_bracket,
-	esc_bracket_either,
-	esc_code_mods,
-	esc_code_mods_end
-} interact_esc_state;
-char interact_mods_or_code;
-char interact_char_or_mods;
-
-#define INTERP_MOD_SHIFT 1
-#define INTERP_MOD_ALT 2
-#define INTERP_MOD_CTRL 4
-
-static void interact_unshift(struct interact_input* result, char in)
-{
-	if ('A' <= in && in <= 'Z')
-	{
-		result->mods |= INTERP_MOD_SHIFT;
-		in ^= 0x20;
-	}
-	
-	result->key = in;
-}
-
-#define INTERP_ANSI_TO_KEY 0x80
-#define INTERP_KEY_UP (INTERP_ANSI_TO_KEY + 'A')
-#define INTERP_KEY_DOWN (INTERP_ANSI_TO_KEY + 'B')
-#define INTERP_KEY_RIGHT (INTERP_ANSI_TO_KEY + 'C')
-#define INTERP_KEY_LEFT (INTERP_ANSI_TO_KEY + 'D')
-#define INTERP_KEY_END (INTERP_ANSI_TO_KEY + 'F')
-#define INTERP_KEY_HOME (INTERP_ANSI_TO_KEY + 'H')
-
-#define INTERP_KEY_INSERT (INTERP_ANSI_TO_KEY + 'E')
-#define INTERP_KEY_DELETE (INTERP_ANSI_TO_KEY + 'I')
-
-#define INTERP_KEY_PGUP (INTERP_ANSI_TO_KEY + 'J')
-#define INTERP_KEY_PGDN (INTERP_ANSI_TO_KEY + 'K')
-
-static char interact_vt[] = {
-	INTERP_KEY_HOME, INTERP_KEY_INSERT, INTERP_KEY_DELETE, INTERP_KEY_END,
-	INTERP_KEY_PGUP, INTERP_KEY_PGDN, INTERP_KEY_HOME, INTERP_KEY_END
-};
+struct interact_buffer interact_prompt = { 0 };
 
 static struct interact_input
 interact_parse_input(char next)
@@ -190,9 +145,12 @@ interact(void)
 {
 	static char		input[256];		/* big enough? */
 	const char * volatile	interp_identifier;
-	int input_index;
+	
+	char* line = interact_prompt.line;
 
 	TSENTER();
+	
+	interact_register_action("backspace", interact_line_backspace, NULL);
 
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
@@ -220,10 +178,8 @@ interact(void)
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
 	
-	interact_register_action("backspace", interact_line_backspace, &buffer);
-	
 	for (;;) {
-		input_index = 0;
+		interact_prompt.cursor = 0;
 		interp_emit_prompt();
 		
 		//printf("\n");
@@ -233,14 +189,14 @@ interact(void)
 			
 			//printf("[%x %c %i] ", n, n, interact_esc_state);
 			
-			struct interact_input i = interact_parse_input(n);
-			
-			if (i.key > 0) {
-				if (i.key == 0xd)
-				{
-					printf("\n");
-					break;
-				}
+			if (in == 0xd)
+			{
+				printf("\n");
+				break;
+			}
+			else if (in != 0)
+			{
+				line[interact_prompt.cursor++] = in;
 				
 				input[input_index++] = i.key;
 				
@@ -250,8 +206,15 @@ interact(void)
 			}
 		}
 		
-		input[input_index] = '\0';
-		interp_run(input);
+		line[interact_prompt.cursor] = '\0';
+		
+		//struct interact_input i = interact_parse_stroke(line);
+		
+		//printf(" is ");
+		//interact_print_stroke(i);
+		//printf("\n");
+		
+		interp_run(line);
 	}
 }
 
