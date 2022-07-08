@@ -94,6 +94,16 @@ static char lua_keybind_handler(struct interact_keybind* bind)
 	return 0;
 }
 
+static void delete_bind(lua_State* L, struct interact_keybind* bind) {
+	if (bind->action == lua_keybind_handler) {
+		struct lua_keybind* luabind = (struct lua_keybind*)bind;
+		
+		luaL_unref(L, LUA_REGISTRYINDEX, luabind->callback_ref);
+	}
+	
+	interact_remove_binding(bind);
+}
+
 static int
 lua_keybind_register(lua_State *L)
 {
@@ -117,12 +127,27 @@ lua_keybind_register(lua_State *L)
 		return 1;
 	}
 	
-	struct interact_keybind* bind = interact_add_binding_raw(4, input.mods, input.key, lua_keybind_handler, L);
-	struct lua_keybind* luabind = (struct lua_keybind*)bind;
+	struct interact_keybind* existing = interact_find_binding(input.mods, input.key);
 	
-	luabind->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	if (existing != NULL) {
+		delete_bind(L, existing);
+	}
 	
-	lua_pushlightuserdata(L, luabind);
+	struct interact_keybind* bind = NULL;
+	
+	if (lua_islightuserdata(L, -1)) {
+		struct interact_predefined_action* predef = lua_touserdata(L, -1);
+		
+		bind = interact_add_binding(input.mods, input.key, predef->action, predef->parameter);
+	}
+	else {
+		struct interact_keybind* bind = interact_add_binding_raw(4, input.mods, input.key, lua_keybind_handler, L);
+		struct lua_keybind* luabind = (struct lua_keybind*)bind;
+		
+		luabind->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+	
+	lua_pushlightuserdata(L, bind);
 	return 1;
 }
 
@@ -143,13 +168,7 @@ lua_keybind_delete(lua_State *L)
 	
 	struct interact_keybind* bind = (struct interact_keybind*)lua_touserdata(L, -1);
 	
-	if (bind->action == lua_keybind_handler) {
-		struct lua_keybind* luabind = (struct lua_keybind*)bind;
-		
-		luaL_unref(L, LUA_REGISTRYINDEX, luabind->callback_ref);
-	}
-	
-	interact_remove_binding(bind);
+	delete_bind(L, bind);
 	
 	lua_pushboolean(L, 1);
 	return 1;
@@ -202,7 +221,17 @@ luaopen_keybind(lua_State *L)
 	luaL_newlib(L, keybindlib);
 	
 	lua_newtable(L);
-	lua_setfield(L, -2, "registered");
+	
+	struct interact_predefined_action* current = interact_first_action();
+	
+	while (current != NULL) {
+		lua_pushlightuserdata(L, current);
+		lua_setfield(L, -2, current->name);
+		
+		current = interact_next_action(current);
+	}
+	
+	lua_setfield(L, -2, "actions");
 	
 	return 1;
 }
