@@ -149,7 +149,7 @@ interact_input_to_char(struct interact_input input)
 STAILQ_HEAD(interact_binds, interact_keybind) interact_binds_head =
 	 STAILQ_HEAD_INITIALIZER(interact_binds_head);
 
-static struct interact_keybind* find_binding(char mods, char key)
+struct interact_keybind* interact_find_binding(char mods, char key)
 {
 	struct interact_keybind* p;
 	
@@ -161,12 +161,12 @@ static struct interact_keybind* find_binding(char mods, char key)
 	return NULL;
 }
 
-struct interact_keybind* interact_add_binding(char mods, char key, interact_action action, void* parameter)
+struct interact_keybind* interact_add_binding_raw(int extraspace, char mods, char key, interact_action action, void* parameter)
 {
-	struct interact_keybind* result = find_binding(mods, key);
+	struct interact_keybind* result = interact_find_binding(mods, key);
 	
 	if (result == NULL)
-		result = malloc(sizeof(struct interact_keybind));
+		result = malloc(sizeof(struct interact_keybind) + extraspace);
 	
 	result->target.mods = mods;
 	result->target.key = key;
@@ -178,11 +178,23 @@ struct interact_keybind* interact_add_binding(char mods, char key, interact_acti
 	return result;
 }
 
+struct interact_keybind* interact_add_binding(char mods, char key, interact_action action, void* parameter)
+{
+	return interact_add_binding_raw(0, mods, key, action, parameter);
+}
+
+void interact_remove_binding(struct interact_keybind* bind)
+{
+	STAILQ_REMOVE(&interact_binds_head, bind, interact_keybind, next);
+	
+	free(bind);
+}
+
 char interact_on_input(char in)
 {
 	struct interact_input input = interact_parse_input(in);
 	
-	struct interact_keybind* binding = find_binding(input.mods, input.key);
+	struct interact_keybind* binding = interact_find_binding(input.mods, input.key);
 	
 	if (binding != NULL)
 	{
@@ -221,7 +233,7 @@ static struct keyname_map emacs_longname_to_key[] = {
 	{0, 0}
 };
 
-static char lookup_key_from_name(struct keyname_map* map, char* name)
+static char lookup_key_from_name(struct keyname_map* map, const char* name)
 {
 	int i = 0;
 	
@@ -234,7 +246,7 @@ static char lookup_key_from_name(struct keyname_map* map, char* name)
 	
 	return 0;
 }
-static char* lookup_name_from_key(struct keyname_map* map, char key)
+static char* lookup_name_from_key(struct keyname_map* map, const char key)
 {
 	int i = 0;
 	
@@ -290,12 +302,12 @@ void interact_print_stroke(struct interact_input stroke)
 	}
 }
 
-struct interact_input interact_parse_stroke(char* stroke)
+struct interact_input interact_parse_stroke(const char* stroke)
 {
 	struct interact_input result = { 0 };
 	
 	int len = strlen(stroke);
-	char* p = stroke;
+	const char* p = stroke;
 	
 	while (len >= 3 && p[1] == '-')
 	{
@@ -409,3 +421,57 @@ command_keybind(int argc, char *argv[])
 
 	return (bind == NULL);
 }
+
+
+
+/*
+static int
+prompt_instance_index(lua_State *L)
+{
+	
+	
+}
+
+static const struct luaL_Reg bufferlib[] = {
+	{"__index", buffer_instance_index},
+	{"__newindex", buffer_instance_newindex}
+}
+
+static const struct luaL_Reg prompt_instance_meta[] = {
+	{"__index", prompt_instance_index},
+	{"cursor", prompt_instance_cursor}
+	{ NULL, NULL },
+};
+
+static int
+lua_pushprompt(lua_State *L, struct interact_line_buffer* buffer) {
+	lua_newtable(L);
+	
+	lua_pushlightuserdata(L, buffer);
+	lua_setfield(L, -2, "pbuffer");
+	
+	lua_getglobal(L, "loader_prompt");
+	lua_setmetatable(L, -2);
+	
+	return 1;
+}
+
+int
+luaopen_prompt(lua_State *L)
+{
+	luaL_newlib(L, keybindlib);
+	
+	lua_pushstring(L, "");
+	lua_setfield(L, -2, "machine");
+	lua_pushstring(L, MACHINE_ARCH);
+	lua_setfield(L, -2, "machine_arch");
+	lua_pushstring(L, LUA_PATH);
+	lua_setfield(L, -2, "lua_path");
+	
+	luaL_newmetatable(L, "loader_prompt");
+	luaL_register(L, NULL, prompt_instance_meta);
+	lua_pop(L, 1);
+	
+	return 1;
+}
+*/
