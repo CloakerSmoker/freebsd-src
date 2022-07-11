@@ -145,12 +145,6 @@ interact(void)
 {
 	static char		input[256];		/* big enough? */
 	const char * volatile	interp_identifier;
-	
-	char* line = interact_prompt.line;
-	
-	interact_prompt.gap = PROMPT_LINE_LENGTH;
-	
-	line[PROMPT_LINE_LENGTH] = '\0';
 
 	TSENTER();
 	
@@ -187,13 +181,12 @@ interact(void)
 	 */
 	printf("\nType '?' for a list of commands, 'help' for more detailed help.\n");
 	if (getenv("prompt") == NULL)
-		setenv("prompt", "${interpret}", 1);
+		setenv("prompt", "${interpret}", 1);const char * volatile	interp_identifier;
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
 	
 	for (;;) {
-		interact_prompt.cursor = 0;
-		interact_prompt.gap = PROMPT_LINE_LENGTH;
+		prompt_init();
 		interp_emit_prompt();
 		
 		//printf("\n");
@@ -205,14 +198,11 @@ interact(void)
 			
 			if (in == 0xd)
 			{
-				printf("\n");
 				break;
 			}
 			else if (in != 0)
 			{
-				line[interact_prompt.cursor++] = in;
-				
-				input[input_index++] = i.key;
+				prompt_input(in);
 				
 				printf("%c", i.key);
 				
@@ -220,14 +210,15 @@ interact(void)
 			}
 		}
 		
-		PROMPT_END_LINE();
-		line[interact_prompt.cursor] = '\0';
-		
 		//struct interact_input i = interact_parse_stroke(line);
 		
 		//printf(" is ");
 		//interact_print_stroke(i);
 		//printf("\n");
+		
+		char* line = prompt_getline();
+		
+		printf("\r\n");
 		
 		interp_run(line);
 	}

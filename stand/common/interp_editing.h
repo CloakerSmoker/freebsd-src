@@ -8,6 +8,10 @@ struct interact_buffer {
 
 extern struct interact_buffer interact_prompt;
 
+void prompt_init();
+void prompt_input(char);
+char* prompt_getline();
+
 char prompt_forward_char(struct interact_keybind*);
 char prompt_backward_char(struct interact_keybind*);
 

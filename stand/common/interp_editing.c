@@ -11,11 +11,29 @@
 #define GAP (interact_prompt.gap)
 
 void prompt_show_aftergap() {
+	int gaplen = PROMPT_LINE_LENGTH - GAP;
 	char* aftergap = &LINE[GAP];
 	
 	printf("\x1b[0K");
-	printf("%s", aftergap);
-	printf("\x1b[%zuD", strlen(aftergap));
+	
+	if (gaplen) {
+		printf("%s", aftergap);
+		printf("\x1b[%dD", gaplen);
+	}
+}
+
+void prompt_init() {
+	CURSOR = 0;
+	GAP = PROMPT_LINE_LENGTH;
+	LINE[GAP] = '\0';
+}
+
+void prompt_input(char in) {
+	LINE[CURSOR++] = in;
+	
+	printf("%c", in);
+	
+	prompt_show_aftergap();
 }
 
 char prompt_forward_char(struct interact_keybind* bind) {
@@ -64,10 +82,12 @@ char prompt_delete_forward_char(struct interact_keybind* bind)
 char prompt_move_end_of_line(struct interact_keybind* bind) {
 	int gapsize = PROMPT_LINE_LENGTH - GAP;
 	
-	printf("\x1b[%iC", gapsize);
-	
-	for (int i = 0; i < gapsize; i++) {
-		LINE[CURSOR++] = LINE[GAP++];
+	if (gapsize != 0) {
+		printf("\x1b[%iC", gapsize);
+		
+		for (int i = 0; i < gapsize; i++) {
+			LINE[CURSOR++] = LINE[GAP++];
+		}
 	}
 	
 	return 0;
@@ -75,11 +95,19 @@ char prompt_move_end_of_line(struct interact_keybind* bind) {
 char prompt_move_beginning_of_line(struct interact_keybind* bind) {
 	int cursorsize = CURSOR;
 	
-	printf("\x1b[%iD", cursorsize);
-	
-	for (int i = 0; i < cursorsize; i++) {
-		LINE[--GAP] = LINE[--CURSOR];
+	if (cursorsize != 0) {
+		printf("\x1b[%iD", cursorsize);
+		
+		for (int i = 0; i < cursorsize; i++) {
+			LINE[--GAP] = LINE[--CURSOR];
+		}
 	}
 	
 	return 0;
+}
+
+char* prompt_getline() {
+	prompt_move_end_of_line(NULL);
+	
+	return LINE;
 }
