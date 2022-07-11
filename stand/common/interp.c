@@ -147,10 +147,21 @@ interact(void)
 	const char * volatile	interp_identifier;
 	
 	char* line = interact_prompt.line;
+	
+	interact_prompt.gap = PROMPT_LINE_LENGTH;
+	
+	line[PROMPT_LINE_LENGTH] = '\0';
 
 	TSENTER();
 	
-	interact_register_action("backspace", interact_line_backspace, NULL);
+	interact_register_action("backward-char", prompt_backward_char, NULL);
+	interact_register_action("forward-char", prompt_forward_char, NULL);
+	
+	interact_register_action("move-end-of-line", prompt_move_end_of_line, NULL);
+	interact_register_action("move-beginning-of-line", prompt_move_beginning_of_line, NULL);
+	
+	interact_register_action("delete-backward-char", prompt_delete_backward_char, NULL);
+	interact_register_action("delete-forward-char", prompt_delete_forward_char, NULL);
 
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
@@ -168,7 +179,9 @@ interact(void)
 	 * Before interacting, we might want to autoboot.
 	 */
 	autoboot_maybe();
-
+	
+	interp_include("/boot/keys.rc");
+	
 	/*
 	 * Not autobooting, go manual
 	 */
@@ -180,6 +193,7 @@ interact(void)
 	
 	for (;;) {
 		interact_prompt.cursor = 0;
+		interact_prompt.gap = PROMPT_LINE_LENGTH;
 		interp_emit_prompt();
 		
 		//printf("\n");
@@ -206,6 +220,7 @@ interact(void)
 			}
 		}
 		
+		PROMPT_END_LINE();
 		line[interact_prompt.cursor] = '\0';
 		
 		//struct interact_input i = interact_parse_stroke(line);
