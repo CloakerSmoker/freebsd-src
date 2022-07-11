@@ -1,38 +1,4 @@
-/*-
- * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-/*
- * Simple commandline interpreter, toplevel and misc.
- *
- * XXX may be obsoleted by BootFORTH or some other, better, interpreter.
- */
-
 #include <stand.h>
 #include <string.h>
 #include "bootstrap.h"
@@ -40,14 +6,80 @@ __FBSDID("$FreeBSD$");
 #include "interp_bindings.h"
 #include "interp_editing.h"
 
-char interact_line_backspace(struct interact_keybind* bind)
+#define LINE (interact_prompt.line)
+#define CURSOR (interact_prompt.cursor)
+#define GAP (interact_prompt.gap)
+
+void prompt_show_aftergap() {
+	char* aftergap = &LINE[GAP];
+	
+	printf("\x1b[0K");
+	printf("%s", aftergap);
+	printf("\x1b[%zuD", strlen(aftergap));
+}
+
+char prompt_forward_char(struct interact_keybind* bind) {
+	if (GAP != PROMPT_LINE_LENGTH) {
+		LINE[CURSOR++] = LINE[GAP++];
+		
+		printf("\x1b[1C");
+	}
+	
+	return 0;
+}
+char prompt_backward_char(struct interact_keybind* bind) {
+	if (CURSOR != 0) {
+		LINE[--GAP] = LINE[--CURSOR];
+		
+		printf("\x1b[1D");
+	}
+	
+	return 0;
+}
+
+char prompt_delete_backward_char(struct interact_keybind* bind)
 {
-	if (interact_prompt.cursor != 0)
-	{
-		interact_prompt.line[--interact_prompt.cursor] = '\0';
+	if (CURSOR != 0) {
+		LINE[--CURSOR] = '\0';
 		
 		putchar('\b');
+		
+		prompt_show_aftergap();
 	}
 	
 	return 0;
 };
+
+char prompt_delete_forward_char(struct interact_keybind* bind)
+{
+	if (GAP != PROMPT_LINE_LENGTH) {
+		LINE[GAP++] = '\0';
+		
+		prompt_show_aftergap();
+	}
+	
+	return 0;
+};
+
+char prompt_move_end_of_line(struct interact_keybind* bind) {
+	int gapsize = PROMPT_LINE_LENGTH - GAP;
+	
+	printf("\x1b[%iC", gapsize);
+	
+	for (int i = 0; i < gapsize; i++) {
+		LINE[CURSOR++] = LINE[GAP++];
+	}
+	
+	return 0;
+}
+char prompt_move_beginning_of_line(struct interact_keybind* bind) {
+	int cursorsize = CURSOR;
+	
+	printf("\x1b[%iD", cursorsize);
+	
+	for (int i = 0; i < cursorsize; i++) {
+		LINE[--GAP] = LINE[--CURSOR];
+	}
+	
+	return 0;
+}
