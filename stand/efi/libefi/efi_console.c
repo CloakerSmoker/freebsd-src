@@ -682,6 +682,15 @@ CM(void)
 	end_term();
 }
 
+static void
+CR(int x, int y)
+{
+	if (args[0] > 0)
+		args[0]--;
+	curs_move(&curx, &cury, curx + x, cury + y);
+	end_term();
+}
+
 /* Home cursor (left top corner), also called from mode command. */
 void
 HO(void)
@@ -792,6 +801,18 @@ efi_term_emu(int c)
 			else
 				args[++argc] = 0;
 			break;
+		case 'C':
+			if (argc < 0)
+				CR(1, 0);
+			else
+				CR(args[0], 0);
+			break;
+		case 'D':
+			if (argc < 0)
+				CR(-1, 0);
+			else
+				CR(-args[0], 0);
+			break;
 		case 'H':		/* ho = \E[H */
 			if (argc < 0)
 				HO();
@@ -805,6 +826,12 @@ efi_term_emu(int c)
 				CD();
 			else
 				bail_out(c);
+			break;
+		case 'K':
+			if (argc < 0)
+				CL(0);
+			else
+				CL(args[0]);
 			break;
 		case 'm':
 			if (argc < 0) {
