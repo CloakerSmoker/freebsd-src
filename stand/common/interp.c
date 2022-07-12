@@ -156,7 +156,10 @@ interact(void)
 	
 	interact_register_action("delete-backward-char", prompt_delete_backward_char, NULL);
 	interact_register_action("delete-forward-char", prompt_delete_forward_char, NULL);
-
+	
+	interact_register_action("forward-word", prompt_forward_word, NULL);
+	interact_register_action("backward-word", prompt_backward_word, NULL);
+	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
 	 * the compiler as it's considered an externally observable event.  This

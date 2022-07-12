@@ -26,6 +26,7 @@ void prompt_init() {
 	CURSOR = 0;
 	GAP = PROMPT_LINE_LENGTH;
 	LINE[GAP] = '\0';
+	LINE[GAP + 1] = '\0';
 }
 
 void prompt_input(char in) {
@@ -110,4 +111,51 @@ char* prompt_getline() {
 	prompt_move_end_of_line(NULL);
 	
 	return LINE;
+}
+
+static int count_forward_word() {
+	int gapsize = PROMPT_LINE_LENGTH - GAP;
+	int run = 0;
+	
+	for (; run < gapsize && isspace(LINE[GAP + run]); run++);
+	for (; run < gapsize && isgraph(LINE[GAP + run]); run++);
+	
+	return run;
+}
+static int count_backward_word() {
+	int cursorsize = CURSOR;
+	int run = 0;
+	
+	for (; run < cursorsize && isspace(LINE[CURSOR - run - 1]); run++);
+	for (; run < cursorsize && isgraph(LINE[CURSOR - run - 1]); run++);
+	
+	return run;
+}
+
+char prompt_forward_word(struct interact_keybind* bind) {
+	int run = count_forward_word();
+	
+	if (run != 0) {
+		for (int i = 0; i < run; i++) {
+			LINE[CURSOR++] = LINE[GAP++];
+		}
+		
+		printf("\x1b[%iC", run);
+	}
+	
+	return 0;
+}
+
+char prompt_backward_word(struct interact_keybind* bind) {
+	int run = count_backward_word();
+	
+	if (run != 0) {
+		for (int i = 0; i < run; i++) {
+			LINE[--GAP] = LINE[--CURSOR];
+		}
+		
+		printf("\x1b[%iD", run);
+	}
+	
+	return 0;
 }
