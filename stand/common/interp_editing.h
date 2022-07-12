@@ -17,7 +17,6 @@ char prompt_backward_char(struct interact_keybind*);
 
 char prompt_move_end_of_line(struct interact_keybind*);
 char prompt_move_beginning_of_line(struct interact_keybind*);
-#define PROMPT_END_LINE() prompt_move_end_of_line(NULL)
 
 char prompt_forward_word(struct interact_keybind*);
 char prompt_backward_word(struct interact_keybind*);
