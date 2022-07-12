@@ -160,6 +160,12 @@ interact(void)
 	interact_register_action("forward-word", prompt_forward_word, NULL);
 	interact_register_action("backward-word", prompt_backward_word, NULL);
 	
+	interact_register_action("yank", prompt_yank, NULL);
+	
+	interact_register_action("kill-word", prompt_forward_kill_word, NULL);
+	interact_register_action("backward-kill-word", prompt_backward_kill_word, NULL);
+	interact_register_action("kill-line", prompt_kill_line, NULL);
+	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
 	 * the compiler as it's considered an externally observable event.  This
@@ -188,8 +194,10 @@ interact(void)
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
 	
+	prompt_init();
+	
 	for (;;) {
-		prompt_init();
+		prompt_reset();
 		interp_emit_prompt();
 		
 		//printf("\n");

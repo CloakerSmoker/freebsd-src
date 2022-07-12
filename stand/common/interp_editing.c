@@ -9,6 +9,8 @@
 #define LINE (interact_prompt.line)
 #define CURSOR (interact_prompt.cursor)
 #define GAP (interact_prompt.gap)
+#define KILL (interact_prompt.kill)
+#define KILLCURSOR (interact_prompt.killcursor)
 
 void prompt_show_aftergap() {
 	int gaplen = PROMPT_LINE_LENGTH - GAP;
@@ -22,11 +24,16 @@ void prompt_show_aftergap() {
 	}
 }
 
-void prompt_init() {
+void prompt_reset() {
 	CURSOR = 0;
 	GAP = PROMPT_LINE_LENGTH;
 	LINE[GAP] = '\0';
-	LINE[GAP + 1] = '\0';
+}
+
+void prompt_init() {
+	prompt_reset();
+	KILLCURSOR = 0;
+	KILL[KILLCURSOR] = '\0';
 }
 
 void prompt_input(char in) {
@@ -109,6 +116,7 @@ char prompt_move_beginning_of_line(struct interact_keybind* bind) {
 
 char* prompt_getline() {
 	prompt_move_end_of_line(NULL);
+	LINE[CURSOR] = '\0';
 	
 	return LINE;
 }
@@ -155,6 +163,66 @@ char prompt_backward_word(struct interact_keybind* bind) {
 		}
 		
 		printf("\x1b[%iD", run);
+	}
+	
+	return 0;
+}
+
+char prompt_yank(struct interact_keybind* bind) {
+	if (KILLCURSOR) {
+		for (int i = 0; i < KILLCURSOR; i++) {
+			LINE[CURSOR++] = KILL[i];
+			printf("%c", KILL[i]);
+		}
+		
+		prompt_show_aftergap();
+	}
+	
+	return 0;
+}
+
+char prompt_forward_kill_word(struct interact_keybind* bind) {
+	int run = count_forward_word();
+	
+	if (run != 0) {
+		memcpy(KILL, &LINE[GAP], run);
+		KILLCURSOR = run;
+		
+		GAP += run;
+		prompt_show_aftergap();
+	}
+	
+	return 0;
+}
+
+char prompt_backward_kill_word(struct interact_keybind* bind) {
+	int run = count_backward_word();
+	
+	if (run != 0) {
+		memcpy(KILL, &LINE[CURSOR - run], run);
+		KILLCURSOR = run;
+		
+		printf("\x1b[%iD", run);
+		
+		CURSOR -= run;
+		prompt_show_aftergap();
+	}
+	
+	return 0;
+}
+
+char prompt_kill_line(struct interact_keybind* bind) {
+	prompt_move_beginning_of_line(NULL);
+	
+	int gapsize = PROMPT_LINE_LENGTH - GAP;
+	
+	if (gapsize) {
+		memcpy(KILL, &LINE[GAP], gapsize);
+		KILLCURSOR = gapsize;
+		
+		GAP = PROMPT_LINE_LENGTH;
+		
+		prompt_show_aftergap();
 	}
 	
 	return 0;
