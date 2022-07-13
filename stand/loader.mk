@@ -5,7 +5,7 @@
 CFLAGS+=-I${LDRSRC}
 
 SRCS+=	boot.c commands.c console.c devopen.c interp.c 
-SRCS+=	interp_backslash.c interp_parse.c interp_bindings.c interp_editing.c ls.c misc.c 
+SRCS+=	interp_backslash.c interp_parse.c prompt_bindings.c prompt_editing.c ls.c misc.c 
 SRCS+=	module.c nvstore.c pnglite.c tslog.c
 
 CFLAGS.module.c += -I$(SRCTOP)/sys/teken -I${SRCTOP}/contrib/pnglite

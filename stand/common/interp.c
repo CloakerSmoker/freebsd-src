@@ -37,12 +37,30 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "bootstrap.h"
 
-#include "interp_bindings.h"
-#include "interp_editing.h"
+#include "prompt_bindings.h"
+#include "prompt_editing.h"
 
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
-struct interact_buffer interact_prompt = { 0 };
+struct prompt_buffer prompt_prompt = { 0 };
+
+struct {
+	char* name;
+	prompt_action action;
+} prompt_predefined_actions[] = {
+	{"backward-char", prompt_backward_char},
+	{"forward-char", prompt_forward_char},
+	{"move-end-of-line", prompt_move_end_of_line},
+	{"move-beginning-of-line", prompt_move_beginning_of_line},
+	{"delete-backward-char", prompt_delete_backward_char},
+	{"delete-forward-char", prompt_delete_forward_char},
+	{"forward-word", prompt_forward_word},
+	{"backward-word", prompt_backward_word},
+	{"yank", prompt_yank},
+	{"kill-word", prompt_forward_kill_word},
+	{"backward-kill-word", prompt_backward_kill_word},
+	{"kill-line", prompt_kill_line}	
+};
 
 static struct interact_input
 interact_parse_input(char next)
@@ -145,26 +163,13 @@ interact(void)
 {
 	static char		input[256];		/* big enough? */
 	const char * volatile	interp_identifier;
+	int i;
 
 	TSENTER();
 	
-	interact_register_action("backward-char", prompt_backward_char, NULL);
-	interact_register_action("forward-char", prompt_forward_char, NULL);
-	
-	interact_register_action("move-end-of-line", prompt_move_end_of_line, NULL);
-	interact_register_action("move-beginning-of-line", prompt_move_beginning_of_line, NULL);
-	
-	interact_register_action("delete-backward-char", prompt_delete_backward_char, NULL);
-	interact_register_action("delete-forward-char", prompt_delete_forward_char, NULL);
-	
-	interact_register_action("forward-word", prompt_forward_word, NULL);
-	interact_register_action("backward-word", prompt_backward_word, NULL);
-	
-	interact_register_action("yank", prompt_yank, NULL);
-	
-	interact_register_action("kill-word", prompt_forward_kill_word, NULL);
-	interact_register_action("backward-kill-word", prompt_backward_kill_word, NULL);
-	interact_register_action("kill-line", prompt_kill_line, NULL);
+	for (i = 0; i < (sizeof(prompt_predefined_actions) / sizeof(prompt_predefined_actions[0])); i++) {
+		prompt_register_action(prompt_predefined_actions[i].name, prompt_predefined_actions[i].action);
+	}
 	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
@@ -205,7 +210,13 @@ interact(void)
 		for (;;) {
 			char n = getchar();
 			
-			//printf("[%x %c %i] ", n, n, interact_esc_state);
+			/*
+			printf("[%x '%c'] ", n, n);
+			struct interact_input i = interact_parse_input(n);
+			printf("{%x %x '%c'} ", i.mods, i.key, i.key);
+			char in = interact_input_to_char(i);
+			//*/
+			char in = prompt_on_input(n);
 			
 			if (in == 0xd)
 			{
@@ -213,7 +224,7 @@ interact(void)
 			}
 			else if (in != 0)
 			{
-				prompt_input(in);
+				prompt_rawinput(in);
 				
 				printf("%c", i.key);
 				
