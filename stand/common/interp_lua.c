@@ -44,7 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <lfs.h>
 #include <lutils.h>
 
-#include "interp_bindings.h"
+#include "prompt_bindings.h"
 
 struct interp_lua_softc {
 	lua_State	*luap;
@@ -78,30 +78,30 @@ interp_lua_realloc(void *ud __unused, void *ptr, size_t osize __unused, size_t n
 }
 
 struct lua_keybind {
-	struct interact_keybind bind;
 	int callback_ref;
 };
 
-static char lua_keybind_handler(struct interact_keybind* bind)
+static void
+lua_keybind_handler(void* data)
 {
-	struct lua_keybind* luabind = (struct lua_keybind*)bind;
-	lua_State *L = bind->parameter;
+	struct lua_keybind* bind = data;
+	lua_State *L = lua_softc.luap;
 	
-	lua_rawgeti(L, LUA_REGISTRYINDEX, luabind->callback_ref);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, bind->callback_ref);
 	
 	lua_pcall(L, 0, 0, 0);
-	
-	return 0;
 }
 
-static void delete_bind(lua_State* L, struct interact_keybind* bind) {
+static void
+delete_bind(lua_State* L, struct prompt_keybind* bind) {
 	if (bind->action == lua_keybind_handler) {
-		struct lua_keybind* luabind = (struct lua_keybind*)bind;
+		void* data = sizeof(struct prompt_keybind) + (void*)bind;
+		struct lua_keybind* luabind = data;
 		
 		luaL_unref(L, LUA_REGISTRYINDEX, luabind->callback_ref);
 	}
 	
-	interact_remove_binding(bind);
+	prompt_remove_binding(bind);
 }
 
 static int
@@ -120,29 +120,29 @@ lua_keybind_register(lua_State *L)
 	}
 	
 	const char* stroke = lua_tostring(L, -2);
-	struct interact_input input = interact_parse_stroke(stroke);
+	struct prompt_input input = prompt_parse_stroke(stroke);
 	
 	if (input.key == 0) {
 		lua_pushnil(L);
 		return 1;
 	}
 	
-	struct interact_keybind* existing = interact_find_binding(input.mods, input.key);
+	struct prompt_keybind* existing = prompt_find_binding(input.mods, input.key);
 	
 	if (existing != NULL) {
 		delete_bind(L, existing);
 	}
 	
-	struct interact_keybind* bind = NULL;
+	struct prompt_keybind* bind = NULL;
 	
 	if (lua_islightuserdata(L, -1)) {
-		struct interact_predefined_action* predef = lua_touserdata(L, -1);
+		struct prompt_predefined_action* predef = lua_touserdata(L, -1);
 		
-		bind = interact_add_binding(input.mods, input.key, predef->action, predef->parameter);
+		bind = prompt_add_binding(input.mods, input.key, predef->action);
 	}
 	else {
-		struct interact_keybind* bind = interact_add_binding_raw(4, input.mods, input.key, lua_keybind_handler, L);
-		struct lua_keybind* luabind = (struct lua_keybind*)bind;
+		struct prompt_keybind* bind = prompt_add_binding_raw(4, input.mods, input.key, lua_keybind_handler);
+		struct lua_keybind* luabind = sizeof(struct prompt_keybind) + (void*)bind;
 		
 		luabind->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
@@ -166,7 +166,7 @@ lua_keybind_delete(lua_State *L)
 		return 1;
 	}
 	
-	struct interact_keybind* bind = (struct interact_keybind*)lua_touserdata(L, -1);
+	struct prompt_keybind* bind = (struct prompt_keybind*)lua_touserdata(L, -1);
 	
 	delete_bind(L, bind);
 	
@@ -190,14 +190,14 @@ lua_keybind_find(lua_State *L)
 	}
 	
 	const char* stroke = lua_tostring(L, -1);
-	struct interact_input input = interact_parse_stroke(stroke);
+	struct prompt_input input = prompt_parse_stroke(stroke);
 	
 	if (input.key == 0) {
 		lua_pushnil(L);
 		return 1;
 	}
 	
-	struct interact_keybind* bind = interact_find_binding(input.mods, input.key);
+	struct prompt_keybind* bind = prompt_find_binding(input.mods, input.key);
 	
 	if (bind == NULL) {
 		lua_pushnil(L);
@@ -222,13 +222,13 @@ luaopen_keybind(lua_State *L)
 	
 	lua_newtable(L);
 	
-	struct interact_predefined_action* current = interact_first_action();
+	struct prompt_predefined_action* current = prompt_first_action();
 	
 	while (current != NULL) {
 		lua_pushlightuserdata(L, current);
 		lua_setfield(L, -2, current->name);
 		
-		current = interact_next_action(current);
+		current = prompt_next_action(current);
 	}
 	
 	lua_setfield(L, -2, "actions");
