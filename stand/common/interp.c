@@ -59,7 +59,9 @@ struct {
 	{"yank", prompt_yank},
 	{"kill-word", prompt_forward_kill_word},
 	{"backward-kill-word", prompt_backward_kill_word},
-	{"kill-line", prompt_kill_line}	
+	{"kill-line", prompt_kill_line},
+	{"next-history-element", prompt_next_history_element},
+	{"previous-history-element", prompt_previous_history_element}
 };
 
 static struct interact_input
