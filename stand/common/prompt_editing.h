@@ -1,5 +1,10 @@
 #define PROMPT_LINE_LENGTH 256
 
+struct prompt_history_entry {
+	char line[PROMPT_LINE_LENGTH];
+	TAILQ_ENTRY(prompt_history_entry) entry;
+};
+
 struct prompt_buffer {
 	char line[PROMPT_LINE_LENGTH + 1];
 	int cursor;
@@ -7,6 +12,9 @@ struct prompt_buffer {
 	
 	char kill[PROMPT_LINE_LENGTH + 1];
 	int killcursor;
+	
+	TAILQ_HEAD(prompt_history_head, prompt_history_entry) history_head;
+	struct prompt_history_entry* history_cursor;
 };
 
 extern struct prompt_buffer prompt_prompt;
@@ -33,3 +41,6 @@ void prompt_yank(void*);
 void prompt_forward_kill_word(void*);
 void prompt_backward_kill_word(void*);
 void prompt_kill_line(void*);
+
+void prompt_next_history_element(void*);
+void prompt_previous_history_element(void*);

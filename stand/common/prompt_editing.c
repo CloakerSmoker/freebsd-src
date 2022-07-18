@@ -11,6 +11,8 @@
 #define GAP (prompt_prompt.gap)
 #define KILL (prompt_prompt.kill)
 #define KILLCURSOR (prompt_prompt.killcursor)
+#define HISTORY (&prompt_prompt.history_head)
+#define HISTORYCURSOR (prompt_prompt.history_cursor)
 
 void prompt_show_aftergap() {
 	int gaplen = PROMPT_LINE_LENGTH - GAP;
@@ -105,6 +107,14 @@ void prompt_move_beginning_of_line(void* data) {
 char* prompt_getline() {
 	prompt_move_end_of_line(NULL);
 	LINE[CURSOR] = '\0';
+	HISTORYCURSOR = NULL;
+	
+	if (CURSOR != 0) {
+		struct prompt_history_entry* entry = malloc(sizeof(struct prompt_history_entry));
+		memcpy(entry->line, LINE, CURSOR);
+		
+		TAILQ_INSERT_TAIL(HISTORY, entry, entry);
+	}
 	
 	return LINE;
 }
@@ -202,4 +212,34 @@ void prompt_kill_line(void* data) {
 		
 		prompt_show_aftergap();
 	}
+}
+
+void prompt_recall_history(struct prompt_history_entry* entry) {
+	prompt_move_beginning_of_line(NULL);
+	prompt_reset();
+	prompt_show_aftergap();
+	
+	if (entry != NULL) {
+		CURSOR = strlen(entry->line);
+		memcpy(LINE, entry->line, CURSOR);
+		printf("%s", entry->line);
+	}
+}
+
+void prompt_next_history_element(void* data) {
+	if (HISTORYCURSOR != NULL) {
+		HISTORYCURSOR = TAILQ_NEXT(HISTORYCURSOR, entry);
+	}
+	
+	prompt_recall_history(HISTORYCURSOR);
+}
+void prompt_previous_history_element(void* data) {
+	if (HISTORYCURSOR == NULL) {
+		HISTORYCURSOR = TAILQ_LAST(HISTORY, prompt_history_head);
+	}
+	else {
+		HISTORYCURSOR = TAILQ_PREV(HISTORYCURSOR, prompt_history_head, entry);
+	}
+	
+	prompt_recall_history(HISTORYCURSOR);
 }
