@@ -347,6 +347,9 @@ struct prompt_keybind*
 prompt_add_stroke_binding(char* stroke, prompt_action action) {
 	struct prompt_input input = prompt_parse_stroke(stroke);
 	
+	if (input.mods == 0 && input.key == 0)
+		return NULL;
+	
 	return prompt_add_binding(input.mods, input.key, action);
 }
 
@@ -375,8 +378,8 @@ prompt_register_action(char* name, prompt_action action) {
 	return result;
 }
 
-static struct prompt_predefined_action* 
-find_action(char* name) {
+static struct prompt_predefined_action*
+find_predef_by_name(char* name) {
 	struct prompt_predefined_action* p;
 	
 	STAILQ_FOREACH(p, &prompt_actions_head, next) {
@@ -387,9 +390,21 @@ find_action(char* name) {
 	return NULL;
 }
 
+static struct prompt_predefined_action*
+find_predef_by_action(prompt_action action) {
+	struct prompt_predefined_action* p;
+	
+	STAILQ_FOREACH(p, &prompt_actions_head, next) {
+		if (p->action == action)
+			return p;
+	}
+	
+	return NULL;
+}
+
 struct prompt_keybind* 
 prompt_add_stroke_action_binding(char* stroke, char* action_name) {
-	struct prompt_predefined_action* predef = find_action(action_name);
+	struct prompt_predefined_action* predef = find_predef_by_name(action_name);
 	
 	if (predef == NULL)
 		return NULL;
@@ -401,24 +416,72 @@ COMMAND_SET(keybind, "keybind", "bind a key to an action", command_keybind);
 
 static int
 command_keybind(int argc, char *argv[]) {
-	if (argc != 3)
-		return 1;
+	if (argc != 3) {
+		command_errmsg = "wrong number of arguments";
+		return CMD_ERROR;
+	}
 	
 	struct prompt_keybind* bind = prompt_add_stroke_action_binding(argv[1], argv[2]);
 	
 	if (bind != NULL) {
-		printf("Bound ");
-		prompt_print_stroke(bind->target);
-		printf(" to %s\n", argv[2]);
+		return CMD_OK;
 	}
 	else {
-		printf("Could not bind '%s' to '%s'\n", argv[1], argv[2]);
+		snprintf(command_errbuf, sizeof(command_errbuf), "could not bind '%s' to '%s'", argv[1], argv[2]);
+		
+		return CMD_ERROR;
 	}
-
-	return (bind == NULL);
 }
 
+COMMAND_SET(keybinds, "keybinds", "list bound keys", command_keybinds);
 
+static int
+command_keybinds(int argc, char *argv[]) {
+	struct prompt_keybind* p;
+	
+	STAILQ_FOREACH(p, &prompt_binds_head, next) {
+		prompt_print_stroke(p->target);
+		
+		struct prompt_predefined_action* predef = find_predef_by_action(p->action);
+		
+		if (predef != NULL) {
+			printf(" %s\n", predef->name);
+		}
+		else {
+			printf(" <interpreter callback %p>\n", p->action);
+		}
+	}
+	
+	return CMD_OK;
+}
+
+COMMAND_SET(keyunbind, "keyunbind", "unbind a previously bound key", command_keyunbind);
+
+static int
+command_keyunbind(int argc, char *argv[]) {
+		if (argc != 2) {
+		command_errmsg = "wrong number of arguments";
+		return CMD_ERROR;
+	}
+	
+	struct prompt_input stroke = prompt_parse_stroke(argv[1]);
+	
+	if (stroke.mods == 0 && stroke.key == 0) {
+		command_errmsg = "could not parse key stroke";
+		return CMD_ERROR;
+	}
+	
+	struct prompt_keybind* bind = prompt_find_binding(stroke.mods, stroke.key);
+	
+	if (bind == NULL) {
+		command_errmsg = "could not find any binding for key stroke";
+		return CMD_ERROR;
+	}
+	
+	prompt_remove_binding(bind);
+	
+	return CMD_OK;
+}
 
 /*
 static int

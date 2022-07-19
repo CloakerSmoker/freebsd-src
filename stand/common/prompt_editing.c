@@ -36,6 +36,8 @@ void prompt_init() {
 	prompt_reset();
 	KILLCURSOR = 0;
 	KILL[KILLCURSOR] = '\0';
+	
+	TAILQ_INIT(HISTORY);
 }
 
 void prompt_rawinput(char in) {
@@ -242,4 +244,28 @@ void prompt_previous_history_element(void* data) {
 	}
 	
 	prompt_recall_history(HISTORYCURSOR);
+}
+
+COMMAND_SET(history, "history", "display history entries", command_history);
+
+static int
+command_history(int argc, char *argv[])
+{
+	struct prompt_history_entry* e;
+	
+	/* 
+	 * Pop the "history" entry from the history
+	 */
+	TAILQ_REMOVE(HISTORY, TAILQ_LAST(HISTORY, prompt_history_head), entry);
+	
+	pager_open();
+	
+	TAILQ_FOREACH(e, HISTORY, entry) {
+		pager_output(e->line);
+		pager_output("\n");
+	}
+	
+	pager_close();
+	
+	return 0;
 }
