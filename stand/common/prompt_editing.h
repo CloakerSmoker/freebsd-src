@@ -45,5 +45,7 @@ void prompt_kill_line(void*);
 void prompt_next_history_element(void*);
 void prompt_previous_history_element(void*);
 
+void prompt_history_add(const char*, int);
+void prompt_history_remove(struct prompt_history_entry*);
 struct prompt_history_entry* prompt_history_first();
 struct prompt_history_entry* prompt_history_next(struct prompt_history_entry*);

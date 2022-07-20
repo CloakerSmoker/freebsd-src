@@ -257,18 +257,20 @@ lookup_name_from_key(struct keyname_map* map, const char key) {
 }
 
 void
-prompt_print_stroke(struct prompt_input stroke) {
+prompt_stroke_to_string(char* buf, size_t len, struct prompt_input stroke) {
+	int off = 0;
+	
 	if (stroke.mods) {
 		if (stroke.mods & PROMPT_MOD_ALT) {
-			printf("M-");
+			off += snprintf(&buf[off], len, "M-");
 		}
 		
 		if (stroke.mods & PROMPT_MOD_CTRL) {
-			printf("C-");
+			off += snprintf(&buf[off], len, "C-");
 		}
 		
 		if (stroke.mods & PROMPT_MOD_SHIFT) {
-			printf("S-");
+			off += snprintf(&buf[off], len, "S-");
 		}
 	}
 	
@@ -276,25 +278,34 @@ prompt_print_stroke(struct prompt_input stroke) {
 		char* name = lookup_name_from_key(emacs_shortname_to_key, stroke.key);
 		
 		if (name) {
-			printf("%s", name);
+			off += snprintf(&buf[off], len, "%s", name);
 		}
 		else {
-			printf("\\x%x", stroke.key);
+			off += snprintf(&buf[off], len, "\\x%x", stroke.key);
 		}
 	}
 	else if (0x20 <= stroke.key && stroke.key <= 0x126) {
-		printf("%c", stroke.key);
+		off += snprintf(&buf[off], len, "%c", stroke.key);
 	}
 	else {
 		char* name = lookup_name_from_key(emacs_longname_to_key, stroke.key);
 		
 		if (name) {
-			printf("%s", name);
+			off += snprintf(&buf[off], len, "%s", name);
 		}
 		else {
-			printf("\\x%x", stroke.key);
+			off += snprintf(&buf[off], len, "\\x%x", stroke.key);
 		}
 	}
+}
+
+void
+prompt_print_stroke(struct prompt_input stroke) {
+	char buf[20] = { 0 };
+	
+	prompt_stroke_to_string(buf, sizeof(buf), stroke);
+	
+	printf("%s", buf);
 }
 
 struct prompt_input
@@ -341,6 +352,13 @@ prompt_parse_stroke(const char* stroke) {
 	}
 	
 	return result;
+}
+
+struct prompt_keybind* prompt_first_binding() {
+	return STAILQ_FIRST(&prompt_binds_head);
+}
+struct prompt_keybind* prompt_next_binding(struct prompt_keybind* bind) {
+	return STAILQ_NEXT(bind, next);
 }
 
 struct prompt_keybind*
@@ -459,7 +477,7 @@ COMMAND_SET(keyunbind, "keyunbind", "unbind a previously bound key", command_key
 
 static int
 command_keyunbind(int argc, char *argv[]) {
-		if (argc != 2) {
+	if (argc != 2) {
 		command_errmsg = "wrong number of arguments";
 		return CMD_ERROR;
 	}
