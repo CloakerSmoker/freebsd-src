@@ -53,8 +53,12 @@ struct prompt_keybind* prompt_add_binding_raw(int, char, char, prompt_action);
 struct prompt_keybind* prompt_add_binding(char, char, prompt_action);
 void prompt_remove_binding(struct prompt_keybind*);
 
+void prompt_stroke_to_string(char*, size_t, struct prompt_input);
 void prompt_print_stroke(struct prompt_input);
 struct prompt_input prompt_parse_stroke(const char*);
+
+struct prompt_keybind* prompt_first_binding();
+struct prompt_keybind* prompt_next_binding(struct prompt_keybind*);
 
 struct prompt_predefined_action* prompt_first_action();
 struct prompt_predefined_action* prompt_next_action(struct prompt_predefined_action*);

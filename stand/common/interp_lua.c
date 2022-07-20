@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <lutils.h>
 
 #include "prompt_bindings.h"
+#include "prompt_editing.h"
 
 struct interp_lua_softc {
 	lua_State	*luap;
@@ -208,10 +209,39 @@ lua_keybind_find(lua_State *L)
 	return 1;
 }
 
+static int
+lua_keybind_list(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	lua_newtable(L);
+	
+	struct prompt_keybind* bind = prompt_first_binding();
+	int i = 1;
+	
+	while (bind != NULL) {
+		char buf[20] = { 0 };
+		prompt_stroke_to_string(buf, sizeof(buf), bind->target);
+		
+		lua_pushstring(L, buf);
+		lua_rawseti(L, -2, i++);
+		
+		bind = prompt_next_binding(bind);
+	}
+	
+	return 1;
+}
+
 static const struct luaL_Reg keybindlib[] = {
 	{"register", lua_keybind_register},
 	{"delete", lua_keybind_delete},
 	{"find", lua_keybind_find},
+	{"list", lua_keybind_list},
 	{NULL, NULL}
 };
 
@@ -232,6 +262,99 @@ luaopen_keybind(lua_State *L)
 	}
 	
 	lua_setfield(L, -2, "actions");
+	
+	return 1;
+}
+
+static int
+lua_history_add(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 1) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	if (!lua_isstring(L, -1)) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	const char* entry = lua_tostring(L, -1);
+	
+	prompt_history_add(entry, strlen(entry));
+	
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int
+lua_history_remove(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 1) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	int index = (int)lua_tonumber(L, -1);
+	
+	struct prompt_history_entry* entry = prompt_history_first();
+	int i = 0;
+	
+	while (entry != NULL) {
+		if (i++ == index) {
+			prompt_history_remove(entry);
+			
+			lua_pushboolean(L, 1);
+			return 1;
+		}
+		
+		entry = prompt_history_next(entry);
+	}
+	
+	lua_pushnil(L);
+	return 1;
+}
+
+static int
+lua_history_list(lua_State *L)
+{
+	int argc = lua_gettop(L);
+	
+	if (argc != 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	lua_newtable(L);
+	
+	struct prompt_history_entry* entry = prompt_history_first();
+	int i = 1;
+	
+	while (entry != NULL) {
+		lua_pushstring(L, entry->line);
+		lua_rawseti(L, -2, i++);
+		
+		entry = prompt_history_next(entry);
+	}
+	
+	return 1;
+}
+
+static const struct luaL_Reg historylib[] = {
+	{"add", lua_history_add},
+	{"remove", lua_history_remove},
+	{"list", lua_history_list},
+	{NULL, NULL}
+};
+
+int
+luaopen_history(lua_State *L)
+{
+	luaL_newlib(L, historylib);
 	
 	return 1;
 }
@@ -258,6 +381,7 @@ static const luaL_Reg loadedlibs[] = {
   {"loader", luaopen_loader},
   {"pager", luaopen_pager},
   {"keybind", luaopen_keybind},
+  {"history", luaopen_history},
   {NULL, NULL}
 };
 

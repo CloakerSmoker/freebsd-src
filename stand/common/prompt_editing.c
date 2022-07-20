@@ -112,10 +112,7 @@ char* prompt_getline() {
 	HISTORYCURSOR = NULL;
 	
 	if (CURSOR != 0) {
-		struct prompt_history_entry* entry = malloc(sizeof(struct prompt_history_entry));
-		memcpy(entry->line, LINE, CURSOR);
-		
-		TAILQ_INSERT_TAIL(HISTORY, entry, entry);
+		prompt_history_add(LINE, CURSOR);
 	}
 	
 	return LINE;
@@ -246,6 +243,24 @@ void prompt_previous_history_element(void* data) {
 	prompt_recall_history(HISTORYCURSOR);
 }
 
+void prompt_history_add(const char* line, int len) {
+	struct prompt_history_entry* entry = malloc(sizeof(struct prompt_history_entry));
+	memcpy(entry->line, line, len);
+	
+	TAILQ_INSERT_TAIL(HISTORY, entry, entry);
+}
+void prompt_history_remove(struct prompt_history_entry* entry) {
+	TAILQ_REMOVE(HISTORY, entry, entry);
+	free(entry);
+}
+
+struct prompt_history_entry* prompt_history_first() {
+	return TAILQ_FIRST(HISTORY);
+}
+struct prompt_history_entry* prompt_history_next(struct prompt_history_entry* entry) {
+	return TAILQ_NEXT(entry, entry);
+}
+
 COMMAND_SET(history, "history", "display history entries", command_history);
 
 static int
@@ -256,7 +271,7 @@ command_history(int argc, char *argv[])
 	/* 
 	 * Pop the "history" entry from the history
 	 */
-	TAILQ_REMOVE(HISTORY, TAILQ_LAST(HISTORY, prompt_history_head), entry);
+	prompt_history_remove(TAILQ_LAST(HISTORY, prompt_history_head));
 	
 	pager_open();
 	
