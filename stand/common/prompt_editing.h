@@ -1,5 +1,10 @@
 #define PROMPT_LINE_LENGTH 256
 
+/*
+ * The prompt is just a gap buffer, with a single kill buffer, and a linked list
+ * of history entries.
+ */
+
 struct prompt_history_entry {
 	char line[PROMPT_LINE_LENGTH];
 	TAILQ_ENTRY(prompt_history_entry) entry;
@@ -24,6 +29,10 @@ void prompt_reset();
 void prompt_rawinput(char);
 char* prompt_getline();
 
+/*
+ * Editing actions
+ */
+
 void prompt_forward_char(void*);
 void prompt_backward_char(void*);
 
@@ -44,6 +53,10 @@ void prompt_kill_line(void*);
 
 void prompt_next_history_element(void*);
 void prompt_previous_history_element(void*);
+
+/*
+ * History manipulation
+ */
 
 void prompt_history_add(const char*, int);
 void prompt_history_remove(struct prompt_history_entry*);
