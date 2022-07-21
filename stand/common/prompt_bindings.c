@@ -6,6 +6,23 @@ __FBSDID("$FreeBSD$");
 
 #include "prompt_bindings.h"
 
+/*
+ * Main parts: input escape parser, keybind management, predefined actions, commands
+ */
+
+/*
+ * We need to handle
+ * "char"
+ * "ESC char"
+ * "ESC [ code ~"
+ * "ESC [ char ; mods"
+ * "ESC [ mods ; code ~"
+ * each of which is assigned a state, with the proper transitions between each.
+ *
+ * Special keys are just (PROMPT_ANSI_TO_KEY + ANSI_CODE) with unused ANSI codes
+ * picked for VT codes.
+ */
+
 enum {
 	esc_normal, 
 	esc_esc, 
@@ -20,6 +37,10 @@ static char prompt_char_or_mods;
 
 static void
 unshift(struct prompt_input* result, char in) {
+	/* 
+	 * Helper to turn an uppercase/shifted key back into shift+lowercase
+	 */
+	
 	if ('A' <= in && in <= 'Z') {
 		result->mods |= PROMPT_MOD_SHIFT;
 		in ^= 0x20;
@@ -27,6 +48,10 @@ unshift(struct prompt_input* result, char in) {
 	
 	result->key = in;
 }
+
+/*
+ * Map [1-9]~ VT codes back into keycodes
+ */
 
 static char prompt_vt[] = {
 	PROMPT_KEY_HOME, PROMPT_KEY_INSERT, PROMPT_KEY_DELETE, PROMPT_KEY_END,
@@ -43,6 +68,10 @@ prompt_parse_input(char next) {
 				prompt_esc_state = esc_esc;
 			else if (next <= 0x1f && next != 0x8 && next != 0x9 && next != 0xd)
 			{
+				/*
+				 * Control characters turn into ctrl+key
+				 */
+				
 				result.key = next - 1 + 'a';
 				result.mods |= PROMPT_MOD_CTRL;
 			}
@@ -54,6 +83,10 @@ prompt_parse_input(char next) {
 				prompt_esc_state = esc_bracket;
 			else 
 			{
+				/*
+				 * "ESC char" turns back into alt+char
+				 */
+				
 				result.mods |= PROMPT_MOD_ALT;
 				unshift(&result, next);
 				prompt_esc_state = esc_normal;
@@ -62,6 +95,11 @@ prompt_parse_input(char next) {
 		case esc_bracket:
 			if ('A' <= next && next <= 'Z')
 			{
+				/*
+				 * Plain ANSI escapes without modifiers terminate after the first
+				 * non-numeric character
+				 */
+				
 				result.key = PROMPT_ANSI_TO_KEY + next;
 				prompt_esc_state = esc_normal;
 			}
@@ -72,6 +110,10 @@ prompt_parse_input(char next) {
 			}
 			else 
 			{
+				/*
+				 * "ESC [ char" into alt+char, mainly for "ESC [ [" to work
+				 */
+				
 				result.mods |= PROMPT_MOD_ALT;
 				unshift(&result, next);
 				prompt_esc_state = esc_normal;
@@ -82,6 +124,10 @@ prompt_parse_input(char next) {
 				prompt_esc_state = esc_code_mods;
 			else if (next == '~')
 			{
+				/*
+				 * VT escape terminated by ~, mods_or_code is a code
+				 */
+				
 				prompt_mods_or_code -= '1';
 				
 				if (prompt_mods_or_code < 8)
@@ -91,6 +137,10 @@ prompt_parse_input(char next) {
 			}
 			else 
 			{
+				/*
+				 * ESC [ mods ; char
+				 */
+				
 				result.mods = prompt_mods_or_code - '0' - 1;
 				
 				unshift(&result, next);
@@ -107,6 +157,10 @@ prompt_parse_input(char next) {
 			
 			if (next == '~')
 			{
+				/*
+				 * VT escape terminated by ~, mods_or_code is a code
+				 */
+				
 				prompt_mods_or_code -= '1';
 				
 				if (prompt_mods_or_code < 8)
@@ -114,6 +168,10 @@ prompt_parse_input(char next) {
 			}
 			else if (prompt_mods_or_code == '1' && ('A' <= next && next <= 'Z'))
 			{
+				/*
+				 * ANSI escape in the "ESC [ mods ; char" format
+				 */
+				
 				result.key = PROMPT_ANSI_TO_KEY + next;
 			}
 			
@@ -127,6 +185,10 @@ prompt_parse_input(char next) {
 
 char
 prompt_input_to_char(struct prompt_input input) {
+	/*
+	 * Undo the normalization done while parsing
+	 */
+	
 	if (input.key > 0) {
 		if (input.mods & PROMPT_MOD_SHIFT) {
 			if ('a' <= input.key && input.key <= 'z')
@@ -158,6 +220,11 @@ prompt_find_binding(char mods, char key) {
 
 struct prompt_keybind*
 prompt_add_binding_raw(int extraspace, char mods, char key, prompt_action action) {
+	/*
+	 * Allocate extra space on the end of the result for the caller to use how
+	 * they like, it will be passed to their callback.
+	 */
+	
 	struct prompt_keybind* result = prompt_find_binding(mods, key);
 	int new = result == NULL;
 	
@@ -193,6 +260,10 @@ prompt_on_input(char in) {
 	struct prompt_keybind* binding = prompt_find_binding(input.mods, input.key);
 	
 	if (binding != NULL) {
+		/*
+		 * Pass any caller data stored past the end of the binding
+		 */
+		
 		binding->action(sizeof(struct prompt_keybind) + (void*)binding);
 		return 0;
 	}
@@ -205,6 +276,10 @@ struct keyname_map {
 	char key;
 };
 
+/*
+ * Control characters
+ */
+
 static struct keyname_map emacs_shortname_to_key[] = {
 	{"BS", 0x8},
 	{"TAB", 0x9},
@@ -214,6 +289,10 @@ static struct keyname_map emacs_shortname_to_key[] = {
 	{"DEL", 0x7f},
 	{0, 0}
 };
+
+/*
+ * Special characters
+ */
 
 static struct keyname_map emacs_longname_to_key[] = {
 	{"<left>", PROMPT_KEY_LEFT},
@@ -275,6 +354,10 @@ prompt_stroke_to_string(char* buf, size_t len, struct prompt_input stroke) {
 	}
 	
 	if (0 <= stroke.key && stroke.key <= 0x20) {
+		/*
+		 * Control characters
+		 */
+		
 		char* name = lookup_name_from_key(emacs_shortname_to_key, stroke.key);
 		
 		if (name) {
@@ -284,10 +367,18 @@ prompt_stroke_to_string(char* buf, size_t len, struct prompt_input stroke) {
 			off += snprintf(&buf[off], len, "\\x%x", stroke.key);
 		}
 	}
-	else if (0x20 <= stroke.key && stroke.key <= 0x126) {
+	else if (0x20 <= stroke.key && stroke.key <= 126) {
+		/*
+		 * Printable characters
+		 */
+		
 		off += snprintf(&buf[off], len, "%c", stroke.key);
 	}
 	else {
+		/*
+		 * Special characters
+		 */
+		
 		char* name = lookup_name_from_key(emacs_longname_to_key, stroke.key);
 		
 		if (name) {
@@ -315,6 +406,10 @@ prompt_parse_stroke(const char* stroke) {
 	int len = strlen(stroke);
 	const char* p = stroke;
 	
+	/*
+	 * Any number of "X-" modifiers, back to back
+	 */
+	
 	while (len >= 3 && p[1] == '-') {
 		switch (*p) {
 			case 'C':
@@ -333,14 +428,30 @@ prompt_parse_stroke(const char* stroke) {
 	}
 	
 	if (len != 1) {
+		/*
+		 * More left to parse than a single character like "M-x"
+		 */
+		
 		if (p[0] == '<') {
+			/*
+			 * "M-<special>"
+			 */
+			
 			result.key = lookup_key_from_name(emacs_longname_to_key, p);
 		}
 		else {
+			/*
+			 * "M-CTRL"
+			 */
+			
 			result.key = lookup_key_from_name(emacs_shortname_to_key, p);
 		}
 	}
 	else {
+		/*
+		 * A single character, might include shift as a modifier if it is uppercase
+		 */
+		
 		char ascii = *p;
 		
 		if ('A' <= ascii && ascii <= 'Z') {
@@ -370,6 +481,16 @@ prompt_add_stroke_binding(char* stroke, prompt_action action) {
 	
 	return prompt_add_binding(input.mods, input.key, action);
 }
+
+/*
+ * Predefined actions just map names to functions, mainly for simp since it isn't
+ * possible to define a callback.
+ * Still useful for Lua though, since otherwise Lua would need to manually
+ * implement every editing option instead of just using the predefined ones.
+ *
+ * Lua will "freeze" prompt_actions_head into "keybind.actions" when it is started.
+ * Since predefined actions shouldn't be added at runtime, this should be fine.
+ */
 
 STAILQ_HEAD(prompt_actions, prompt_predefined_action) prompt_actions_head =
 	 STAILQ_HEAD_INITIALIZER(prompt_actions_head);
@@ -466,6 +587,11 @@ command_keybinds(int argc, char *argv[]) {
 			printf(" %s\n", predef->name);
 		}
 		else {
+			/*
+			 * Wouldn't be very kind of us to dig into Lua's data stored after the
+			 * binding, so we have to default to a generic name for Lua actions.
+			 */
+			
 			printf(" <interpreter callback %p>\n", p->action);
 		}
 	}
@@ -501,54 +627,22 @@ command_keyunbind(int argc, char *argv[]) {
 	return CMD_OK;
 }
 
-/*
-static int
-prompt_instance_index(lua_State *L)
-{
-	
-	
-}
-
-static const struct luaL_Reg bufferlib[] = {
-	{"__index", buffer_instance_index},
-	{"__newindex", buffer_instance_newindex}
-}
-
-static const struct luaL_Reg prompt_instance_meta[] = {
-	{"__index", prompt_instance_index},
-	{"cursor", prompt_instance_cursor}
-	{ NULL, NULL },
-};
+COMMAND_SET(showkey, "showkey", "shows how a single keystroke is parsed", command_showkey);
 
 static int
-lua_pushprompt(lua_State *L, struct prompt_line_buffer* buffer) {
-	lua_newtable(L);
+command_showkey(int argc, char *argv[]) {
+	if (argc != 1) {
+		command_errmsg = "wrong number of arguments";
+		return CMD_ERROR;
+	}
 	
-	lua_pushlightuserdata(L, buffer);
-	lua_setfield(L, -2, "pbuffer");
+	struct prompt_input in = { 0 };
 	
-	lua_getglobal(L, "loader_prompt");
-	lua_setmetatable(L, -2);
+	while (in.mods == 0 && in.key == 0)
+		in = prompt_parse_input(getchar());
 	
-	return 1;
+	prompt_print_stroke(in);
+	printf("\n");
+	
+	return CMD_OK;
 }
-
-int
-luaopen_prompt(lua_State *L)
-{
-	luaL_newlib(L, keybindlib);
-	
-	lua_pushstring(L, "");
-	lua_setfield(L, -2, "machine");
-	lua_pushstring(L, MACHINE_ARCH);
-	lua_setfield(L, -2, "machine_arch");
-	lua_pushstring(L, LUA_PATH);
-	lua_setfield(L, -2, "lua_path");
-	
-	luaL_newmetatable(L, "loader_prompt");
-	luaL_register(L, NULL, prompt_instance_meta);
-	lua_pop(L, 1);
-	
-	return 1;
-}
-*/

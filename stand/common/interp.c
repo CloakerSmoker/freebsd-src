@@ -207,38 +207,18 @@ interact(void)
 		prompt_reset();
 		interp_emit_prompt();
 		
-		//printf("\n");
-		
 		for (;;) {
-			char n = getchar();
+			char n = prompt_on_input(getchar());
 			
-			/*
-			printf("[%x '%c'] ", n, n);
-			struct interact_input i = interact_parse_input(n);
-			printf("{%x %x '%c'} ", i.mods, i.key, i.key);
-			char in = interact_input_to_char(i);
-			//*/
-			char in = prompt_on_input(n);
-			
-			if (in == 0xd)
+			if (n == 0xd)
 			{
 				break;
 			}
-			else if (in != 0)
+			else if (n != 0)
 			{
-				prompt_rawinput(in);
-				
-				printf("%c", i.key);
-				
-				//printf("(%x %x) ", i.mods, i.key);
+				prompt_rawinput(n);
 			}
 		}
-		
-		//struct interact_input i = interact_parse_stroke(line);
-		
-		//printf(" is ");
-		//interact_print_stroke(i);
-		//printf("\n");
 		
 		char* line = prompt_getline();
 		

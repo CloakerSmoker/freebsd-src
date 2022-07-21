@@ -46,6 +46,10 @@ struct prompt_predefined_action {
 struct prompt_input prompt_parse_input(char);
 char prompt_input_to_char(struct prompt_input input);
 
+/*
+ * Takes a stream of input escapes, parses them and executes any bindings or
+ * converts the input into a character and returns it.
+ */
 char prompt_on_input(char);
 
 struct prompt_keybind* prompt_find_binding(char, char);

@@ -6,6 +6,10 @@
 #include "prompt_bindings.h"
 #include "prompt_editing.h"
 
+/*
+ * Helper macros, just to make each action a bit more readable
+ */
+
 #define LINE (prompt_prompt.line)
 #define CURSOR (prompt_prompt.cursor)
 #define GAP (prompt_prompt.gap)
@@ -15,6 +19,11 @@
 #define HISTORYCURSOR (prompt_prompt.history_cursor)
 
 void prompt_show_aftergap() {
+	/*
+	 * Clear to end of line, reprint "LINE[GAP:END]", move cursor back so it is
+	 * right before the contents of the gap.
+	 */
+	
 	int gaplen = PROMPT_LINE_LENGTH - GAP;
 	char* aftergap = &LINE[GAP];
 	
@@ -27,12 +36,20 @@ void prompt_show_aftergap() {
 }
 
 void prompt_reset() {
+	/*
+	 * Called to simulate "end of line" in the gap buffer
+	 */
+	
 	CURSOR = 0;
 	GAP = PROMPT_LINE_LENGTH;
 	LINE[GAP] = '\0';
 }
 
 void prompt_init() {
+	/*
+	 * Called once to get the buffer ready to go
+	 */
+	
 	prompt_reset();
 	KILLCURSOR = 0;
 	KILL[KILLCURSOR] = '\0';
@@ -41,6 +58,10 @@ void prompt_init() {
 }
 
 void prompt_rawinput(char in) {
+	/*
+	 * Add a character to the buffer without processing it as input
+	 */
+	
 	LINE[CURSOR++] = in;
 	
 	printf("%c", in);
@@ -107,6 +128,16 @@ void prompt_move_beginning_of_line(void* data) {
 }
 
 char* prompt_getline() {
+	/*
+	 * To get a whole line, we just need to move GAP to the end of the line
+	 * which will put the entire line left of the gap, with CURSOR being the
+	 * length of the line
+	 * 
+	 * We also use this as a chance to add the line to the history, and reset
+	 * the history pointer. This makes the next "history-previous-element" get
+	 * the item which we just added to the history.
+	 */
+	
 	prompt_move_end_of_line(NULL);
 	LINE[CURSOR] = '\0';
 	HISTORYCURSOR = NULL;
@@ -119,6 +150,10 @@ char* prompt_getline() {
 }
 
 static int count_forward_word() {
+	/*
+	 * Ignore whitespace, then consume a whole word forward
+	 */
+	
 	int gapsize = PROMPT_LINE_LENGTH - GAP;
 	int run = 0;
 	
@@ -128,6 +163,10 @@ static int count_forward_word() {
 	return run;
 }
 static int count_backward_word() {
+	/*
+	 * Ignore whitespace, then consume a whole word backward
+	 */
+	
 	int cursorsize = CURSOR;
 	int run = 0;
 	
@@ -162,6 +201,11 @@ void prompt_backward_word(void* data) {
 }
 
 void prompt_yank(void* data) {
+	/*
+	 * Copy KILL[0:KILLCURSOR] back into LINE, starting at CURSOR
+	 * (pushing the gap back)
+	 */
+	
 	if (KILLCURSOR) {
 		for (int i = 0; i < KILLCURSOR; i++) {
 			LINE[CURSOR++] = KILL[i];
@@ -176,6 +220,10 @@ void prompt_forward_kill_word(void* data) {
 	int run = count_forward_word();
 	
 	if (run != 0) {
+		/*
+		 * Find a word, copy it into KILL, then remove it from the gap
+		 */
+		
 		memcpy(KILL, &LINE[GAP], run);
 		KILLCURSOR = run;
 		
@@ -188,6 +236,10 @@ void prompt_backward_kill_word(void* data) {
 	int run = count_backward_word();
 	
 	if (run != 0) {
+		/*
+		 * Find a word, copy it into KILL, then remove it from the end of CURSOR
+		 */
+		
 		memcpy(KILL, &LINE[CURSOR - run], run);
 		KILLCURSOR = run;
 		
@@ -204,6 +256,11 @@ void prompt_kill_line(void* data) {
 	int gapsize = PROMPT_LINE_LENGTH - GAP;
 	
 	if (gapsize) {
+		/*
+		 * Kill an entire line, CURSOR is already 0'd by moving to the start of the
+		 * line, so we just need to reset GAP to reset the buffer.
+		 */
+		
 		memcpy(KILL, &LINE[GAP], gapsize);
 		KILLCURSOR = gapsize;
 		
@@ -214,6 +271,10 @@ void prompt_kill_line(void* data) {
 }
 
 void prompt_recall_history(struct prompt_history_entry* entry) {
+	/*
+	 * Clear the command line, then recall a whole line from history (if there is one)
+	 */
+	
 	prompt_move_beginning_of_line(NULL);
 	prompt_reset();
 	prompt_show_aftergap();
@@ -226,6 +287,11 @@ void prompt_recall_history(struct prompt_history_entry* entry) {
 }
 
 void prompt_next_history_element(void* data) {
+	/*
+	 * "next-history-element" functions as "delete-line" when at the start of
+	 * history
+	 */
+	
 	if (HISTORYCURSOR != NULL) {
 		HISTORYCURSOR = TAILQ_NEXT(HISTORYCURSOR, entry);
 	}
@@ -233,6 +299,11 @@ void prompt_next_history_element(void* data) {
 	prompt_recall_history(HISTORYCURSOR);
 }
 void prompt_previous_history_element(void* data) {
+	/*
+	 * "previous-history-element" at the start of history starts at the most
+	 * recently added entry
+	 */
+	
 	if (HISTORYCURSOR == NULL) {
 		HISTORYCURSOR = TAILQ_LAST(HISTORY, prompt_history_head);
 	}
