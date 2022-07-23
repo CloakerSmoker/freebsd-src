@@ -78,6 +78,11 @@ interp_lua_realloc(void *ud __unused, void *ptr, size_t osize __unused, size_t n
 	return realloc(ptr, nsize);
 }
 
+/*
+ * Appended onto each keybind created from Lua, callback_ref
+ * is just the registry index of a callback
+ */
+
 struct lua_keybind {
 	int callback_ref;
 };
@@ -95,6 +100,10 @@ lua_keybind_handler(void* data)
 
 static void
 delete_bind(lua_State* L, struct prompt_keybind* bind) {
+	/*
+	 * Delete a binding, unref-ing along the way if Lua owns it
+	 */
+	
 	if (bind->action == lua_keybind_handler) {
 		void* data = sizeof(struct prompt_keybind) + (void*)bind;
 		struct lua_keybind* luabind = data;
@@ -131,12 +140,24 @@ lua_keybind_register(lua_State *L)
 	struct prompt_keybind* existing = prompt_find_binding(input.mods, input.key);
 	
 	if (existing != NULL) {
+		/*
+		 * Delete a existing binding to prevent a leak
+		 */
+		
 		delete_bind(L, existing);
 	}
 	
 	struct prompt_keybind* bind = NULL;
 	
 	if (lua_islightuserdata(L, -1)) {
+		/*
+		 * keybind.register(..., lightuserdata)
+		 * means we've been called with a predefined action
+		 * from the keybind.actions table.
+		 * Instead of wrapping a Lua function, just call to the
+		 * predefined action directly.
+		 */
+		
 		struct prompt_predefined_action* predef = lua_touserdata(L, -1);
 		
 		bind = prompt_add_binding(input.mods, input.key, predef->action);
@@ -147,6 +168,11 @@ lua_keybind_register(lua_State *L)
 		
 		luabind->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
+	
+	/*
+	 * Return the binding as lightuserdata, so it can be passed to
+	 * keybind.delete to be removed
+	 */
 	
 	lua_pushlightuserdata(L, bind);
 	return 1;
@@ -178,6 +204,10 @@ lua_keybind_delete(lua_State *L)
 static int
 lua_keybind_find(lua_State *L)
 {
+	/*
+	 * Find a binding by name so it can be deleted
+	 */
+	
 	int argc = lua_gettop(L);
 	
 	if (argc != 1) {
@@ -212,6 +242,10 @@ lua_keybind_find(lua_State *L)
 static int
 lua_keybind_list(lua_State *L)
 {
+	/*
+	 * Get a list of all bound keys
+	 */
+	
 	int argc = lua_gettop(L);
 	
 	if (argc != 0) {
@@ -252,6 +286,10 @@ luaopen_keybind(lua_State *L)
 	
 	lua_newtable(L);
 	
+	/*
+	 * Build keybind.actions out of the list of registered predefined actions
+	 */
+	
 	struct prompt_predefined_action* current = prompt_first_action();
 	
 	while (current != NULL) {
@@ -269,6 +307,10 @@ luaopen_keybind(lua_State *L)
 static int
 lua_history_add(lua_State *L)
 {
+	/*
+	 * Artificially add a line the the prompt history
+	 */
+	
 	int argc = lua_gettop(L);
 	
 	if (argc != 1) {
@@ -292,6 +334,10 @@ lua_history_add(lua_State *L)
 static int
 lua_history_remove(lua_State *L)
 {
+	/*
+	 * Remove a line from the history, identified by index
+	 */
+	
 	int argc = lua_gettop(L);
 	
 	if (argc != 1) {
@@ -322,6 +368,10 @@ lua_history_remove(lua_State *L)
 static int
 lua_history_list(lua_State *L)
 {
+	/*
+	 * Get a list of all lines in the history
+	 */
+	
 	int argc = lua_gettop(L);
 	
 	if (argc != 0) {
