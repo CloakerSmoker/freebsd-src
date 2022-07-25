@@ -61,7 +61,8 @@ struct {
 	{"backward-kill-word", prompt_backward_kill_word},
 	{"kill-line", prompt_kill_line},
 	{"next-history-element", prompt_next_history_element},
-	{"previous-history-element", prompt_previous_history_element}
+	{"previous-history-element", prompt_previous_history_element},
+	{"complete-command", prompt_complete_command}
 };
 
 static struct interact_input
