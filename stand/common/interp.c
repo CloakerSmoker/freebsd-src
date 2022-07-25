@@ -62,7 +62,8 @@ struct {
 	{"kill-line", prompt_kill_line},
 	{"next-history-element", prompt_next_history_element},
 	{"previous-history-element", prompt_previous_history_element},
-	{"complete-command", prompt_complete_command}
+	{"complete-command", prompt_complete_command},
+	{"complete-smart", prompt_complete_smart}
 };
 
 static struct interact_input
@@ -173,6 +174,8 @@ interact(void)
 	for (i = 0; i < (sizeof(prompt_predefined_actions) / sizeof(prompt_predefined_actions[0])); i++) {
 		prompt_register_action(prompt_predefined_actions[i].name, prompt_predefined_actions[i].action);
 	}
+	
+	prompt_register_completer("keyunbind", keyunbind_completer_test);
 	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
