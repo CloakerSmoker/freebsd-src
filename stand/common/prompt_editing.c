@@ -355,3 +355,91 @@ command_history(int argc, char *argv[])
 	
 	return 0;
 }
+
+#define PROMPT_COLUMNS 80
+
+void prompt_complete_command(void* data) {
+	LINE[CURSOR] = '\0';
+
+	const char* match = NULL;
+	int matches = 0;
+	int maxlen = 0;
+	
+	struct bootblk_command	**cmdp;
+	
+	/*
+	 * First pass only determines if there's a single match, second pass will
+	 * actually list all possible matches.
+	 * If there is a single match, we just complete it and bail out early.
+	 * First pass also finds the longest command name, so we can align them
+	 * into columns while printing.
+	 */
+	
+	SET_FOREACH(cmdp, Xcommand_set) {
+		const char* name = (*cmdp)->c_name;
+		
+		if (name != NULL) {
+			int len = strlen(name);
+			
+			if (len > maxlen) {
+				maxlen = len;
+			}
+			
+			if (len > CURSOR && strncmp(LINE, name, CURSOR) == 0) {
+				match = name;
+				matches++;
+			}
+		}
+	}
+	
+	if (matches == 1) {
+		/*
+		 * Single match, just complete it.
+		 */
+		
+		const char* remainder = &match[CURSOR];
+		int rlen = strlen(remainder);
+		
+		printf("%s", remainder);
+		memcpy(&LINE[CURSOR], remainder, rlen);
+		CURSOR += rlen;
+	}
+	else {
+		/*
+		 * Many matches, print all aligned into columns, and then
+		 * re-print the prompt and command line below all options.
+		 */
+		
+		int column = 0;
+		int maxcolums = PROMPT_COLUMNS / maxlen;
+		
+		printf("\n");
+		
+		SET_FOREACH(cmdp, Xcommand_set) {
+			const char* name = (*cmdp)->c_name;
+			
+			if (name != NULL) {
+				int len = strlen(name);
+				
+				if (len > CURSOR && strncmp(LINE, name, CURSOR) == 0) {
+					printf("%s", name);
+					
+					if (++column == maxcolums) {
+						column = 0;
+						printf("\n");
+					}
+					else {
+						for (int i = len; i <= maxlen; i++) {
+							printf(" ");
+						}
+					}
+				}
+			}
+		}
+		
+		printf("\n");
+		interp_emit_prompt();
+		printf("%s", LINE);
+		prompt_show_aftergap();
+	}
+}
