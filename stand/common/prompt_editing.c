@@ -35,6 +35,16 @@ void prompt_show_aftergap() {
 	}
 }
 
+void prompt_reprint() {
+	interp_emit_prompt();
+	
+	for (int i = 0; i < CURSOR; i++) {
+		printf("%c", LINE[i]);
+	}
+	
+	prompt_show_aftergap();
+}
+
 void prompt_reset() {
 	/*
 	 * Called to simulate "end of line" in the gap buffer
@@ -438,8 +448,177 @@ void prompt_complete_command(void* data) {
 		}
 		
 		printf("\n");
-		interp_emit_prompt();
-		printf("%s", LINE);
-		prompt_show_aftergap();
+		prompt_reprint();
+	}
+}
+
+struct prompt_completer_entry {
+	char* command;
+	prompt_completer completer;
+	
+	STAILQ_ENTRY(prompt_completer_entry) next;
+};
+
+STAILQ_HEAD(prompt_completers, prompt_completer_entry) prompt_completers_head =
+	 STAILQ_HEAD_INITIALIZER(prompt_completers_head);
+
+void prompt_register_completer(char* command, prompt_completer completer) {
+	struct prompt_completer_entry* entry = malloc(sizeof(struct prompt_completer_entry));
+	
+	entry->command = command;
+	entry->completer = completer;
+	
+	STAILQ_INSERT_TAIL(&prompt_completers_head, entry, next);
+}
+
+void prompt_complete_smart(void* data) {
+	/*
+	 * "smart" completion, completes a command if there isn't one typed out
+	 * already, or tries to complete command arguments.
+	 */
+	
+	if (GAP != PROMPT_LINE_LENGTH) {
+		return;
+	}
+	
+	int cmdlen = 0;
+	
+	for (; cmdlen < CURSOR && isgraph(LINE[cmdlen]); cmdlen++);
+	
+	if (!isspace(LINE[cmdlen])) {
+		prompt_complete_command(NULL);
+		return;
+	}
+	
+	char old = LINE[cmdlen];
+	LINE[cmdlen] = '\0';
+	
+	char* command = LINE;
+	
+	struct prompt_completer_entry* entry = NULL;
+	struct prompt_completer_entry* e;
+	
+	STAILQ_FOREACH(e, &prompt_completers_head, next) {
+		if (strcmp(e->command, command) == 0) {
+			entry = e;
+			break;
+		}
+	}
+	
+	LINE[cmdlen] = old;
+	
+	if (entry == NULL) {
+		return;
+	}
+	
+	char args[PROMPT_LINE_LENGTH] = { 0 };
+	memcpy(args, &LINE[cmdlen + 1], CURSOR - cmdlen - 1);
+	
+	/*
+	 * Find the number and text of the last/most recent argument so the completer
+	 * has enough context to actually complete the argument.
+	 */
+	
+	int argc = 0;
+	char* argv = NULL;
+	char* next = strtok(args, "\t\f\v ");
+	
+	while (next != NULL) {
+		argc++;
+		argv = next;
+		next = strtok(NULL, "\t\f\v ");
+	}
+	
+	entry->completer(command, argc, argv);
+}
+
+void keyunbind_completer_test(char* command, int argc, char* argv) {
+	/*
+	 * Similar to completing command names, with multiple passes
+	 * TODO: Make this a pattern a macro?
+	 */
+	
+	int maxlen = 0;
+	int arglen = strlen(argv);
+	
+	struct prompt_keybind* match = NULL;
+	int matches = 0;
+	
+	struct prompt_keybind* p = prompt_first_binding();
+	
+	while (p != NULL) {
+		char buf[20] = { 0 };
+	
+		prompt_stroke_to_string(buf, sizeof(buf), p->target);
+		
+		int len = strlen(buf);
+		
+		if (len > maxlen) {
+			maxlen = len;
+		}
+		
+		if (len > arglen && strncmp(argv, buf, arglen) == 0) {
+			match = p;
+			matches++;
+		}
+		
+		p = prompt_next_binding(p);
+	}
+	
+	if (matches == 1) {
+		/*
+		 * Single match, just complete it.
+		 */
+		 
+		char buf[20] = { 0 };
+	
+		prompt_stroke_to_string(buf, sizeof(buf), match->target);
+		
+		char* remainder = buf + arglen;
+		int rlen = strlen(remainder);
+		
+		printf("%s", remainder);
+		memcpy(&LINE[CURSOR], remainder, rlen);
+		CURSOR += rlen;
+	}
+	else {
+		/*
+		 * Many matches, print all aligned into columns, and then
+		 * re-print the prompt and command line below all options.
+		 */
+		
+		int column = 0;
+		int maxcolums = PROMPT_COLUMNS / maxlen;
+		
+		printf("\n");
+		
+		p = prompt_first_binding();
+		
+		while (p != NULL) {
+			char buf[20] = { 0 };
+		
+			prompt_stroke_to_string(buf, sizeof(buf), p->target);
+			
+			int len = strlen(buf);
+			
+			if (len > arglen && strncmp(argv, buf, arglen) == 0) {
+				printf("%s", buf);
+					
+				if (++column == maxcolums) {
+					column = 0;
+					printf("\n");
+				}
+				else {
+					for (int i = len; i <= maxlen; i++) {
+						printf(" ");
+					}
+				}
+			}
+			
+			p = prompt_next_binding(p);
+		}
+		
+		printf("\n");
+		prompt_reprint();
 	}
 }
