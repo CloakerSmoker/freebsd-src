@@ -175,7 +175,7 @@ interact(void)
 		prompt_register_action(prompt_predefined_actions[i].name, prompt_predefined_actions[i].action);
 	}
 	
-	prompt_register_completer("keyunbind", keyunbind_completer_test);
+	prompt_register_completer("keyunbind", keyunbind_completer);
 	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by

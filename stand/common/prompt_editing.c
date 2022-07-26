@@ -368,46 +368,48 @@ command_history(int argc, char *argv[])
 
 #define PROMPT_COLUMNS 80
 
-void prompt_complete_command(void* data) {
-	LINE[CURSOR] = '\0';
+typedef void*(completer_first)();
+typedef void*(completer_next_item)(void*);
+typedef void(completer_item_to_string)(void*, char*, int);
 
-	const char* match = NULL;
-	int matches = 0;
+void prompt_generic_complete(char* argv, completer_first first, completer_next_item next, completer_item_to_string tostring) {
 	int maxlen = 0;
+	int arglen = strlen(argv);
 	
-	struct bootblk_command	**cmdp;
+	void* match = NULL;
+	int matches = 0;
 	
-	/*
-	 * First pass only determines if there's a single match, second pass will
-	 * actually list all possible matches.
-	 * If there is a single match, we just complete it and bail out early.
-	 * First pass also finds the longest command name, so we can align them
-	 * into columns while printing.
-	 */
+	void* p = first();
 	
-	SET_FOREACH(cmdp, Xcommand_set) {
-		const char* name = (*cmdp)->c_name;
+	while (p != NULL) {
+		char buf[20] = { 0 };
+	
+		tostring(p, buf, sizeof(buf));
 		
-		if (name != NULL) {
-			int len = strlen(name);
-			
-			if (len > maxlen) {
-				maxlen = len;
-			}
-			
-			if (len > CURSOR && strncmp(LINE, name, CURSOR) == 0) {
-				match = name;
-				matches++;
-			}
+		int len = strlen(buf);
+		
+		if (len > maxlen) {
+			maxlen = len;
 		}
+		
+		if (len > arglen && strncmp(argv, buf, arglen) == 0) {
+			match = p;
+			matches++;
+		}
+		
+		p = next(p);
 	}
 	
 	if (matches == 1) {
 		/*
 		 * Single match, just complete it.
 		 */
+		 
+		char buf[20] = { 0 };
+	
+		tostring(match, buf, sizeof(buf));
 		
-		const char* remainder = &match[CURSOR];
+		char* remainder = buf + arglen;
 		int rlen = strlen(remainder);
 		
 		printf("%s", remainder);
@@ -424,32 +426,64 @@ void prompt_complete_command(void* data) {
 		int maxcolums = PROMPT_COLUMNS / maxlen;
 		
 		printf("\n");
+		pager_open();
 		
-		SET_FOREACH(cmdp, Xcommand_set) {
-			const char* name = (*cmdp)->c_name;
+		p = first();
+		
+		while (p != NULL) {
+			char buf[20] = { 0 };
+		
+			tostring(p, buf, sizeof(buf));
 			
-			if (name != NULL) {
-				int len = strlen(name);
-				
-				if (len > CURSOR && strncmp(LINE, name, CURSOR) == 0) {
-					printf("%s", name);
+			int len = strlen(buf);
+			
+			if (len > arglen && strncmp(argv, buf, arglen) == 0) {
+				pager_output(buf);
 					
-					if (++column == maxcolums) {
-						column = 0;
-						printf("\n");
-					}
-					else {
-						for (int i = len; i <= maxlen; i++) {
-							printf(" ");
-						}
+				if (++column == maxcolums) {
+					column = 0;
+					pager_output("\n");
+				}
+				else {
+					for (int i = len; i <= maxlen; i++) {
+						pager_output(" ");
 					}
 				}
 			}
+			
+			p = next(p);
 		}
 		
-		printf("\n");
+		pager_output("\n");
+		pager_close();
 		prompt_reprint();
 	}
+}
+
+static void* command_first() {
+	return (void*)1;
+}
+static void* command_next(void* rawlast) {
+	long long int index = (long long int)rawlast;
+	
+	if (index++ > SET_COUNT(Xcommand_set)) {
+		return NULL;
+	}
+	
+	return (void*)(index);
+}
+static void command_tostring(void* rawindex, char* out, int len) {
+	struct bootblk_command* cmd;
+	
+	cmd = SET_ITEM(Xcommand_set, ((long long int)rawindex) - 1);
+	
+	snprintf(out, len, "%s", cmd->c_name);
+}
+
+void prompt_complete_command(void* data) {
+	LINE[CURSOR] = 0;
+	
+	prompt_generic_complete(LINE, command_first, command_next, command_tostring);
 }
 
 struct prompt_completer_entry {
@@ -532,93 +566,18 @@ void prompt_complete_smart(void* data) {
 	entry->completer(command, argc, argv);
 }
 
-void keyunbind_completer_test(char* command, int argc, char* argv) {
-	/*
-	 * Similar to completing command names, with multiple passes
-	 * TODO: Make this a pattern a macro?
-	 */
+static void* keybind_first() {
+	return (void*)prompt_first_binding();
+}
+static void* keybind_next(void* rawlast) {
+	return (void*)prompt_next_binding((struct prompt_keybind*)rawlast);
+}
+static void keybind_tostring(void* raw, char* out, int len) {
+	struct prompt_keybind* p = raw;
 	
-	int maxlen = 0;
-	int arglen = strlen(argv);
-	
-	struct prompt_keybind* match = NULL;
-	int matches = 0;
-	
-	struct prompt_keybind* p = prompt_first_binding();
-	
-	while (p != NULL) {
-		char buf[20] = { 0 };
-	
-		prompt_stroke_to_string(buf, sizeof(buf), p->target);
-		
-		int len = strlen(buf);
-		
-		if (len > maxlen) {
-			maxlen = len;
-		}
-		
-		if (len > arglen && strncmp(argv, buf, arglen) == 0) {
-			match = p;
-			matches++;
-		}
-		
-		p = prompt_next_binding(p);
-	}
-	
-	if (matches == 1) {
-		/*
-		 * Single match, just complete it.
-		 */
-		 
-		char buf[20] = { 0 };
-	
-		prompt_stroke_to_string(buf, sizeof(buf), match->target);
-		
-		char* remainder = buf + arglen;
-		int rlen = strlen(remainder);
-		
-		printf("%s", remainder);
-		memcpy(&LINE[CURSOR], remainder, rlen);
-		CURSOR += rlen;
-	}
-	else {
-		/*
-		 * Many matches, print all aligned into columns, and then
-		 * re-print the prompt and command line below all options.
-		 */
-		
-		int column = 0;
-		int maxcolums = PROMPT_COLUMNS / maxlen;
-		
-		printf("\n");
-		
-		p = prompt_first_binding();
-		
-		while (p != NULL) {
-			char buf[20] = { 0 };
-		
-			prompt_stroke_to_string(buf, sizeof(buf), p->target);
-			
-			int len = strlen(buf);
-			
-			if (len > arglen && strncmp(argv, buf, arglen) == 0) {
-				printf("%s", buf);
-					
-				if (++column == maxcolums) {
-					column = 0;
-					printf("\n");
-				}
-				else {
-					for (int i = len; i <= maxlen; i++) {
-						printf(" ");
-					}
-				}
-			}
-			
-			p = prompt_next_binding(p);
-		}
-		
-		printf("\n");
-		prompt_reprint();
-	}
+	prompt_stroke_to_string(out, len, p->target);
+}
+
+void keyunbind_completer(char* command, int argc, char* argv) {
+	prompt_generic_complete(argv, keybind_first, keybind_next, keybind_tostring);
 }
