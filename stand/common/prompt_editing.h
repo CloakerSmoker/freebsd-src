@@ -73,4 +73,4 @@ void prompt_register_completer(char*, prompt_completer);
 void prompt_complete_command(void*);
 void prompt_complete_smart(void*);
 
-void keyunbind_completer_test(char*, int, char*);
+void keyunbind_completer(char*, int, char*);
