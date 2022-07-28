@@ -392,7 +392,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 			maxlen = len;
 		}
 		
-		if (len > arglen && strncmp(argv, buf, arglen) == 0) {
+		if (len >= arglen && strncmp(argv, buf, arglen) == 0) {
 			match = p;
 			matches++;
 		}
@@ -437,12 +437,15 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 			
 			int len = strlen(buf);
 			
-			if (len > arglen && strncmp(argv, buf, arglen) == 0) {
+			if (len >= arglen && strncmp(argv, buf, arglen) == 0) {
 				pager_output(buf);
 					
 				if (++column == maxcolums) {
 					column = 0;
-					pager_output("\n");
+					
+					if (pager_output("\n")) {
+						break;
+					}
 				}
 				else {
 					for (int i = len; i <= maxlen; i++) {
@@ -454,8 +457,8 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 			p = next(p);
 		}
 		
-		pager_output("\n");
 		pager_close();
+		printf("\n");
 		prompt_reprint();
 	}
 }
@@ -543,7 +546,7 @@ void prompt_complete_smart(void* data) {
 	
 	LINE[cmdlen] = old;
 	
-	if (entry == NULL) {
+	if (entry == NULL || cmdlen == CURSOR) {
 		return;
 	}
 	
@@ -556,20 +559,18 @@ void prompt_complete_smart(void* data) {
 	 */
 	
 	int argc = 1;
-	char* argv = args;
-	char* next = strtok(args, "\t\f\v ");
+	char* last = args;
+	char* next = strpbrk(args, "\t\f\v ");
 	
-	if (next != NULL) {
-		argc = 0;
+	while (next != NULL) {
+		*next = '\0';
+		last = next + 1;
 		
-		while (next != NULL) {
-			argc++;
-			argv = next;
-			next = strtok(NULL, "\t\f\v ");
-		}
+		next = strpbrk(next, "\t\f\v ");
+		argc++;
 	}
 	
-	entry->completer(command, argc, argv);
+	entry->completer(command, argc, last);
 }
 
 static void* keybind_first() {
@@ -603,7 +604,9 @@ static void environ_tostring(void* raw, char* out, int len) {
 }
 
 void environ_completer(char* command, int argc, char* argv) {
-	prompt_generic_complete(argv, environ_first, environ_next, environ_tostring);
+	if (argc == 1) {
+		prompt_generic_complete(argv, environ_first, environ_next, environ_tostring);
+	}
 }
 
 static void* predef_first() {
@@ -621,5 +624,7 @@ static void predef_tostring(void* raw, char* out, int len) {
 }
 
 void predefined_action_completer(char* command, int argc, char* argv) {
-	prompt_generic_complete(argv, predef_first, predef_next, predef_tostring);
+	if (argc == 2) {
+		prompt_generic_complete(argv, predef_first, predef_next, predef_tostring);
+	}
 }

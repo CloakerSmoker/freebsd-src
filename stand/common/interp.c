@@ -62,8 +62,8 @@ struct {
 	{"kill-line", prompt_kill_line},
 	{"next-history-element", prompt_next_history_element},
 	{"previous-history-element", prompt_previous_history_element},
-	{"complete-command", prompt_complete_command},
-	{"complete-smart", prompt_complete_smart}
+	{"command-complete", prompt_complete_command},
+	{"smart-complete", prompt_complete_smart}
 };
 
 struct {
