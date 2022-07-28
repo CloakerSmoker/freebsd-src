@@ -373,7 +373,11 @@ typedef void*(completer_next_item)(void*);
 typedef void(completer_item_to_string)(void*, char*, int);
 
 void prompt_generic_complete(char* argv, completer_first first, completer_next_item next, completer_item_to_string tostring) {
+	char buf[40] = { 0 };
+	
+	void* max = NULL;
 	int maxlen = 0;
+	
 	int arglen = strlen(argv);
 	
 	void* match = NULL;
@@ -388,19 +392,23 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		
 		int len = strlen(buf);
 		
-		if (len > maxlen) {
-			maxlen = len;
-		}
-		
 		if (len >= arglen && strncmp(argv, buf, arglen) == 0) {
 			match = p;
 			matches++;
+			
+			if (len > maxlen) {
+				max = p;
+				maxlen = len;
+			}
 		}
 		
 		p = next(p);
 	}
 	
-	if (matches == 1) {
+	if (matches == 0) {
+		return;
+	}
+	else if (matches == 1) {
 		/*
 		 * Single match, just complete it.
 		 */
@@ -418,9 +426,20 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 	}
 	else {
 		/*
-		 * Many matches, print all aligned into columns, and then
-		 * re-print the prompt and command line below all options.
+		 * Many matches, print all aligned into columns, and then re-print the
+		 * prompt and command line below all options.
+		 * If all matches share a common prefix though, complete through to the
+		 * end of the prefix so you can "jump" through options by just typing
+		 * the few characters of difference.
 		 */
+		
+		char prefixbuf[40] = { 0 };
+		
+		if (max != NULL) {
+			tostring(max, prefixbuf, sizeof(prefixbuf));
+		}
+		
+		int prefixlen = strlen(prefixbuf);
 		
 		int column = 0;
 		int maxcolums = PROMPT_COLUMNS / maxlen;
@@ -431,10 +450,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		p = first();
 		
 		while (p != NULL) {
-			char buf[40] = { 0 };
-		
 			tostring(p, buf, sizeof(buf));
-			
 			int len = strlen(buf);
 			
 			if (len >= arglen && strncmp(argv, buf, arglen) == 0) {
@@ -452,6 +468,14 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 						pager_output(" ");
 					}
 				}
+				
+				for (int i = 0; i < prefixlen; i++) {
+					if (buf[i] != prefixbuf[i]) {
+						prefixbuf[i] = '\0';
+						prefixlen = i;
+						break;
+					}
+				}
 			}
 			
 			p = next(p);
@@ -460,6 +484,15 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		pager_close();
 		printf("\n");
 		prompt_reprint();
+		
+		if (prefixlen != 0) {
+			char* remainder = prefixbuf + arglen;
+			int rlen = prefixlen - arglen;
+			
+			printf("%s", remainder);
+			memcpy(&LINE[CURSOR], remainder, rlen);
+			CURSOR += rlen;
+		}
 	}
 }
 
