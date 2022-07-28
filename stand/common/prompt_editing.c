@@ -382,7 +382,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 	void* p = first();
 	
 	while (p != NULL) {
-		char buf[20] = { 0 };
+		char buf[40] = { 0 };
 	
 		tostring(p, buf, sizeof(buf));
 		
@@ -405,7 +405,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		 * Single match, just complete it.
 		 */
 		 
-		char buf[20] = { 0 };
+		char buf[40] = { 0 };
 	
 		tostring(match, buf, sizeof(buf));
 		
@@ -431,7 +431,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		p = first();
 		
 		while (p != NULL) {
-			char buf[20] = { 0 };
+			char buf[40] = { 0 };
 		
 			tostring(p, buf, sizeof(buf));
 			
@@ -480,10 +480,12 @@ static void command_tostring(void* rawindex, char* out, int len) {
 	snprintf(out, len, "%s", cmd->c_name);
 }
 
+#define COMMAND_COMPLETERS command_first, command_next, command_tostring
+
 void prompt_complete_command(void* data) {
 	LINE[CURSOR] = 0;
 	
-	prompt_generic_complete(LINE, command_first, command_next, command_tostring);
+	prompt_generic_complete(LINE, COMMAND_COMPLETERS);
 }
 
 struct prompt_completer_entry {
@@ -553,14 +555,18 @@ void prompt_complete_smart(void* data) {
 	 * has enough context to actually complete the argument.
 	 */
 	
-	int argc = 0;
-	char* argv = NULL;
+	int argc = 1;
+	char* argv = args;
 	char* next = strtok(args, "\t\f\v ");
 	
-	while (next != NULL) {
-		argc++;
-		argv = next;
-		next = strtok(NULL, "\t\f\v ");
+	if (next != NULL) {
+		argc = 0;
+		
+		while (next != NULL) {
+			argc++;
+			argv = next;
+			next = strtok(NULL, "\t\f\v ");
+		}
 	}
 	
 	entry->completer(command, argc, argv);
@@ -580,4 +586,40 @@ static void keybind_tostring(void* raw, char* out, int len) {
 
 void keyunbind_completer(char* command, int argc, char* argv) {
 	prompt_generic_complete(argv, keybind_first, keybind_next, keybind_tostring);
+}
+
+static void* environ_first() {
+	return environ;
+}
+static void* environ_next(void* rawlast) {
+	struct env_var* ev = rawlast;
+	
+	return ev->ev_next;
+}
+static void environ_tostring(void* raw, char* out, int len) {
+	struct env_var* ev = raw;
+	
+	snprintf(out, len, "%s", ev->ev_name);
+}
+
+void environ_completer(char* command, int argc, char* argv) {
+	prompt_generic_complete(argv, environ_first, environ_next, environ_tostring);
+}
+
+static void* predef_first() {
+	return prompt_first_action();
+}
+static void* predef_next(void* rawlast) {
+	struct prompt_predefined_action* p = rawlast;
+	
+	return prompt_next_action(p);
+}
+static void predef_tostring(void* raw, char* out, int len) {
+	struct prompt_predefined_action* p = raw;
+	
+	snprintf(out, len, "%s", p->name);
+}
+
+void predefined_action_completer(char* command, int argc, char* argv) {
+	prompt_generic_complete(argv, predef_first, predef_next, predef_tostring);
 }

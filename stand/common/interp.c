@@ -66,98 +66,16 @@ struct {
 	{"complete-smart", prompt_complete_smart}
 };
 
-static struct interact_input
-interact_parse_input(char next)
-{
-	struct interact_input result = { 0 };
-	
-	switch (interact_esc_state) {
-		case esc_normal:
-			if (next == 0x1b)
-				interact_esc_state = esc_esc;
-			else if (next <= 0x27 && next != 0x8 && next != 0x9 && next != 0xd)
-			{
-				result.key = next - 1 + 'a';
-				result.mods |= INTERP_MOD_CTRL;
-			}
-			else
-				interact_unshift(&result, next);
-			break;
-		case esc_esc:
-			if (next == '[')
-				interact_esc_state = esc_bracket;
-			else 
-			{
-				result.mods |= INTERP_MOD_ALT;
-				interact_unshift(&result, next);
-				interact_esc_state = esc_normal;
-			}
-			break;
-		case esc_bracket:
-			if ('A' <= next && next <= 'Z')
-			{
-				result.key = INTERP_ANSI_TO_KEY + next;
-				interact_esc_state = esc_normal;
-			}
-			else if ('1' <= next && next <= '9')
-			{
-				interact_esc_state = esc_bracket_either;
-				interact_mods_or_code = next;
-			}
-			else 
-			{
-				result.mods |= INTERP_MOD_ALT;
-				interact_unshift(&result, next);
-				interact_esc_state = esc_normal;
-			}
-			break;
-		case esc_bracket_either:
-			if (next == ';')
-				interact_esc_state = esc_code_mods;
-			else if (next == '~')
-			{
-				interact_mods_or_code -= '1';
-				
-				if (interact_mods_or_code < 8)
-					result.key = interact_vt[(int)interact_mods_or_code];
-				
-				interact_esc_state = esc_normal;
-			}
-			else 
-			{
-				result.mods = interact_mods_or_code - '0' - 1;
-				
-				interact_unshift(&result, next);
-				
-				interact_esc_state = esc_normal;
-			}
-			break;
-		case esc_code_mods:
-			interact_char_or_mods = next;
-			interact_esc_state = esc_code_mods_end;
-			break;
-		case esc_code_mods_end:
-			result.mods = interact_char_or_mods - '0' - 1;
-			
-			if (next == '~')
-			{
-				interact_mods_or_code -= '1';
-				
-				if (interact_mods_or_code < 8)
-					result.key = interact_vt[(int)interact_mods_or_code];
-			}
-			else if (interact_mods_or_code == '1' && ('A' <= next && next <= 'Z'))
-			{
-				result.key = INTERP_ANSI_TO_KEY + next;
-			}
-			
-			interact_esc_state = esc_normal;
-			
-			break;
-	}
-	
-	return result;
-}
+struct {
+	char* name;
+	prompt_completer completer;
+} prompt_completers[] = {
+	{"keybind", predefined_action_completer},
+	{"keyunbind", keyunbind_completer},
+	{"show", environ_completer},
+	{"set", environ_completer},
+	{"unset", environ_completer},
+};
 
 /*
  * Interactive mode
@@ -175,7 +93,9 @@ interact(void)
 		prompt_register_action(prompt_predefined_actions[i].name, prompt_predefined_actions[i].action);
 	}
 	
-	prompt_register_completer("keyunbind", keyunbind_completer);
+	for (i = 0; i < (sizeof(prompt_completers) / sizeof(prompt_completers[0])); i++) {
+		prompt_register_completer(prompt_completers[i].name, prompt_completers[i].completer);
+	}
 	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
