@@ -372,7 +372,7 @@ typedef void*(completer_first)();
 typedef void*(completer_next_item)(void*);
 typedef void(completer_item_to_string)(void*, char*, int);
 
-void prompt_generic_complete(char* argv, completer_first first, completer_next_item next, completer_item_to_string tostring) {
+void prompt_generic_complete(char* argv, completer_first first, completer_next_item next, void* last, completer_item_to_string tostring) {
 	char buf[40] = { 0 };
 	
 	void* max = NULL;
@@ -385,7 +385,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 	
 	void* p = first();
 	
-	while (p != NULL) {
+	while (p != last) {
 		char buf[40] = { 0 };
 	
 		tostring(p, buf, sizeof(buf));
@@ -449,7 +449,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		
 		p = first();
 		
-		while (p != NULL) {
+		while (p != last) {
 			tostring(p, buf, sizeof(buf));
 			int len = strlen(buf);
 			
@@ -497,35 +497,34 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 }
 
 static void* command_first() {
-	return (void*)1;
+	return (void*)0;
 }
 static void* command_next(void* rawlast) {
 	long long int index = (long long int)rawlast;
 	
-	if (index++ > SET_COUNT(Xcommand_set)) {
-		return NULL;
+	if (index > SET_COUNT(Xcommand_set)) {
+		return (void*)-1;
 	}
 	
-	return (void*)(index);
+	return (void*)(++index);
 }
 static void command_tostring(void* rawindex, char* out, int len) {
 	struct bootblk_command* cmd;
 	
-	cmd = SET_ITEM(Xcommand_set, ((long long int)rawindex) - 1);
+	cmd = SET_ITEM(Xcommand_set, (long long int)rawindex);
 	
 	snprintf(out, len, "%s", cmd->c_name);
 }
 
-#define COMMAND_COMPLETERS command_first, command_next, command_tostring
-
 void prompt_complete_command(void* data) {
 	LINE[CURSOR] = 0;
 	
-	prompt_generic_complete(LINE, COMMAND_COMPLETERS);
+	prompt_generic_complete(LINE, command_first, command_next, (void*)-1, command_tostring);
 }
 
 struct prompt_completer_entry {
 	char* command;
+	int argc;
 	prompt_completer completer;
 	
 	STAILQ_ENTRY(prompt_completer_entry) next;
@@ -534,10 +533,11 @@ struct prompt_completer_entry {
 STAILQ_HEAD(prompt_completers, prompt_completer_entry) prompt_completers_head =
 	 STAILQ_HEAD_INITIALIZER(prompt_completers_head);
 
-void prompt_register_completer(char* command, prompt_completer completer) {
+void prompt_register_completer(char* command, int argc, prompt_completer completer) {
 	struct prompt_completer_entry* entry = malloc(sizeof(struct prompt_completer_entry));
 	
 	entry->command = command;
+	entry->argc = argc;
 	entry->completer = completer;
 	
 	STAILQ_INSERT_TAIL(&prompt_completers_head, entry, next);
@@ -557,7 +557,7 @@ void prompt_complete_smart(void* data) {
 	
 	for (; cmdlen < CURSOR && isgraph(LINE[cmdlen]); cmdlen++);
 	
-	if (!isspace(LINE[cmdlen])) {
+	if (!isspace(LINE[cmdlen]) || cmdlen == CURSOR) {
 		prompt_complete_command(NULL);
 		return;
 	}
@@ -566,22 +566,6 @@ void prompt_complete_smart(void* data) {
 	LINE[cmdlen] = '\0';
 	
 	char* command = LINE;
-	
-	struct prompt_completer_entry* entry = NULL;
-	struct prompt_completer_entry* e;
-	
-	STAILQ_FOREACH(e, &prompt_completers_head, next) {
-		if (strcmp(e->command, command) == 0) {
-			entry = e;
-			break;
-		}
-	}
-	
-	LINE[cmdlen] = old;
-	
-	if (entry == NULL || cmdlen == CURSOR) {
-		return;
-	}
 	
 	char args[PROMPT_LINE_LENGTH] = { 0 };
 	memcpy(args, &LINE[cmdlen + 1], CURSOR - cmdlen - 1);
@@ -603,7 +587,23 @@ void prompt_complete_smart(void* data) {
 		argc++;
 	}
 	
-	entry->completer(command, argc, last);
+	struct prompt_completer_entry* entry = NULL;
+	struct prompt_completer_entry* e;
+	
+	STAILQ_FOREACH(e, &prompt_completers_head, next) {
+		if (strcmp(e->command, command) == 0 && e->argc == argc) {
+			entry = e;
+			break;
+		}
+	}
+	
+	LINE[cmdlen] = old;
+	
+	if (entry == NULL) {
+		return;
+	}
+	
+	entry->completer(command, last);
 }
 
 static void* keybind_first() {
@@ -618,8 +618,8 @@ static void keybind_tostring(void* raw, char* out, int len) {
 	prompt_stroke_to_string(out, len, p->target);
 }
 
-void keyunbind_completer(char* command, int argc, char* argv) {
-	prompt_generic_complete(argv, keybind_first, keybind_next, keybind_tostring);
+void keyunbind_completer(char* command, char* argv) {
+	prompt_generic_complete(argv, keybind_first, keybind_next, NULL, keybind_tostring);
 }
 
 static void* environ_first() {
@@ -636,10 +636,8 @@ static void environ_tostring(void* raw, char* out, int len) {
 	snprintf(out, len, "%s", ev->ev_name);
 }
 
-void environ_completer(char* command, int argc, char* argv) {
-	if (argc == 1) {
-		prompt_generic_complete(argv, environ_first, environ_next, environ_tostring);
-	}
+void environ_completer(char* command, char* argv) {
+	prompt_generic_complete(argv, environ_first, environ_next, NULL, environ_tostring);
 }
 
 static void* predef_first() {
@@ -656,8 +654,6 @@ static void predef_tostring(void* raw, char* out, int len) {
 	snprintf(out, len, "%s", p->name);
 }
 
-void predefined_action_completer(char* command, int argc, char* argv) {
-	if (argc == 2) {
-		prompt_generic_complete(argv, predef_first, predef_next, predef_tostring);
-	}
+void predefined_action_completer(char* command, char* argv) {
+	prompt_generic_complete(argv, predef_first, predef_next, NULL, predef_tostring);
 }
