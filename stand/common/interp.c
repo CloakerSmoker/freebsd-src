@@ -68,13 +68,14 @@ struct {
 
 struct {
 	char* name;
+	int argn;
 	prompt_completer completer;
 } prompt_completers[] = {
-	{"keybind", predefined_action_completer},
-	{"keyunbind", keyunbind_completer},
-	{"show", environ_completer},
-	{"set", environ_completer},
-	{"unset", environ_completer},
+	{"keybind", 2, predefined_action_completer},
+	{"keyunbind", 1, keyunbind_completer},
+	{"show", 1, environ_completer},
+	{"set", 1, environ_completer},
+	{"unset", 1, environ_completer},
 };
 
 /*
@@ -94,7 +95,7 @@ interact(void)
 	}
 	
 	for (i = 0; i < (sizeof(prompt_completers) / sizeof(prompt_completers[0])); i++) {
-		prompt_register_completer(prompt_completers[i].name, prompt_completers[i].completer);
+		prompt_register_completer(prompt_completers[i].name, prompt_completers[i].argn, prompt_completers[i].completer);
 	}
 	
 	/*
