@@ -38,9 +38,8 @@ void prompt_show_aftergap() {
 void prompt_reprint() {
 	interp_emit_prompt();
 	
-	for (int i = 0; i < CURSOR; i++) {
-		printf("%c", LINE[i]);
-	}
+	LINE[CURSOR] = 0;
+	printf("%s", LINE);
 	
 	prompt_show_aftergap();
 }
