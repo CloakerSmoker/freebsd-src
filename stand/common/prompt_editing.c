@@ -656,3 +656,71 @@ static void predef_tostring(void* raw, char* out, int len) {
 void predefined_action_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, predef_first, predef_next, NULL, predef_tostring);
 }
+
+int path_completer_dirfd;
+const char* path_completer_basename;
+const char* path_completer_dirname;
+
+static void* path_completer_first() {
+	
+	
+	return NULL;
+}
+static void* path_completer_next(void* rawlast) {
+	long long int index = (long long int)rawlast;
+	
+	if (index > SET_COUNT(Xcommand_set)) {
+		return (void*)-1;
+	}
+	
+	return (void*)(++index);
+}
+static void command_tostring(void* rawindex, char* out, int len) {
+	struct bootblk_command* cmd;
+	
+	cmd = SET_ITEM(Xcommand_set, (long long int)rawindex);
+	
+	snprintf(out, len, "%s", cmd->c_name);
+}
+
+void path_completer(char* command, char* path) {
+	struct stat	sb;
+	const char* rel;
+	
+	if (strlen(path) == 0) {
+		/*
+		 * Technically not const-correct, but since we only modify path when it
+		 * doesn't consist entirely of / characters, this is fine.
+		 */
+		
+		path = "/";
+	}
+	
+	char* start = path;
+	char* end = start + strlen(path);
+	
+	while (end > path && *end == '/') {
+		end--;
+	}
+	
+	char* dirname = start;
+	char* basename = end;
+	
+	if (end == start && *start == '/') {
+		dirname = "/";
+		basename = "";
+	}
+	else {
+		while (basename > dirname && *(basename - 1) != '/') {
+			basename--;
+		}
+		
+		*(basename - 1) = '\0';
+	}
+	
+	path_completer_basename = basename;
+	path_completer_dirname = dirname;
+	
+	
+	
+}

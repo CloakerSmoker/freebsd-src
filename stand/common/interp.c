@@ -76,6 +76,7 @@ struct {
 	{"show", 1, environ_completer},
 	{"set", 1, environ_completer},
 	{"unset", 1, environ_completer},
+	{"ls", 1, path_completer}
 };
 
 /*

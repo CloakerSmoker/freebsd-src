@@ -76,3 +76,4 @@ void prompt_complete_smart(void*);
 void keyunbind_completer(char*, char*);
 void environ_completer(char*, char*);
 void predefined_action_completer(char*, char*);
+void path_completer(char*, char*);
