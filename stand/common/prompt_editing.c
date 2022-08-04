@@ -657,36 +657,52 @@ void predefined_action_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, predef_first, predef_next, NULL, predef_tostring);
 }
 
-int path_completer_dirfd;
-const char* path_completer_basename;
 const char* path_completer_dirname;
+const char* path_completer_basename;
+int path_completer_fd;
 
 static void* path_completer_first() {
-	
-	
-	return NULL;
-}
-static void* path_completer_next(void* rawlast) {
-	long long int index = (long long int)rawlast;
-	
-	if (index > SET_COUNT(Xcommand_set)) {
-		return (void*)-1;
+	if (path_completer_fd) {
+		close(path_completer_fd);
 	}
 	
-	return (void*)(++index);
+	path_completer_fd = open(path_completer_dirname, O_RDONLY);
+	
+	return path_completer_next(NULL);
 }
-static void command_tostring(void* rawindex, char* out, int len) {
-	struct bootblk_command* cmd;
+static void* path_completer_next(void* raw) {
+	struct dirent* entry;
 	
-	cmd = SET_ITEM(Xcommand_set, (long long int)rawindex);
 	
-	snprintf(out, len, "%s", cmd->c_name);
+	if ((entry = readdirfd(path_completer_fd)) == NULL) {
+		return NULL;
+	}
+	
+	return entry;
 }
 
-void path_completer(char* command, char* path) {
-	struct stat	sb;
-	const char* rel;
+static void path_completer_tostring(void* rawlast, char* out, int len) {
+	struct dirent* entry = rawlast;
+	char path[128];
+	struct stat sb = { 0 };
 	
+	if (entry->d_type == 0) {
+		snprintf(path, 128, "%s/%s", path_completer_dirname, entry->d_name);
+		stat(path, &sb);
+	}
+	else {
+		sb.st_mode = entry->d_type;
+	}
+	
+	if (S_ISDIR(sb.st_mode)) {
+		snprintf(out, len, "%s/%s/", path_completer_dirname, entry->d_name);
+	}
+	else {
+		snprintf(out, len, "%s/%s", path_completer_dirname, entry->d_name);
+	}
+}
+
+void path_completer(char* command, char* path) {	
 	if (strlen(path) == 0) {
 		/*
 		 * Technically not const-correct, but since we only modify path when it
@@ -720,7 +736,7 @@ void path_completer(char* command, char* path) {
 	
 	path_completer_basename = basename;
 	path_completer_dirname = dirname;
+	path_completer_fd = 0;
 	
-	
-	
+	prompt_generic_complete(path, path_completer_first, path_completer_next, NULL, path_completer_tostring);
 }
