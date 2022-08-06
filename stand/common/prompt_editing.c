@@ -661,6 +661,16 @@ const char* path_completer_dirname;
 const char* path_completer_basename;
 int path_completer_fd;
 
+static void* path_completer_next(void* raw) {
+	struct dirent* entry;	
+	
+	if ((entry = readdirfd(path_completer_fd)) == NULL) {
+		return NULL;
+	}
+	
+	return entry;
+}
+
 static void* path_completer_first() {
 	if (path_completer_fd) {
 		close(path_completer_fd);
@@ -670,50 +680,38 @@ static void* path_completer_first() {
 	
 	return path_completer_next(NULL);
 }
-static void* path_completer_next(void* raw) {
-	struct dirent* entry;
-	
-	
-	if ((entry = readdirfd(path_completer_fd)) == NULL) {
-		return NULL;
-	}
-	
-	return entry;
-}
 
 static void path_completer_tostring(void* rawlast, char* out, int len) {
 	struct dirent* entry = rawlast;
-	char path[128];
+	//char path[128];
 	struct stat sb = { 0 };
 	
 	if (entry->d_type == 0) {
-		snprintf(path, 128, "%s/%s", path_completer_dirname, entry->d_name);
-		stat(path, &sb);
+		//snprintf(path, 128, "%s%s", path_completer_dirname, entry->d_name);
+		//stat(path, &sb);
 	}
 	else {
 		sb.st_mode = entry->d_type;
 	}
 	
 	if (S_ISDIR(sb.st_mode)) {
-		snprintf(out, len, "%s/%s/", path_completer_dirname, entry->d_name);
+		snprintf(out, len, "%s%s/", path_completer_dirname, entry->d_name);
 	}
 	else {
-		snprintf(out, len, "%s/%s", path_completer_dirname, entry->d_name);
+		snprintf(out, len, "%s%s", path_completer_dirname, entry->d_name);
 	}
 }
 
-void path_completer(char* command, char* path) {	
+void path_completer(char* command, char* argv) {
+	char path[128] = { 0 };
+	snprintf(path, 128, "%s", argv);
+	
 	if (strlen(path) == 0) {
-		/*
-		 * Technically not const-correct, but since we only modify path when it
-		 * doesn't consist entirely of / characters, this is fine.
-		 */
-		
-		path = "/";
+		path[0] = '/';
 	}
 	
 	char* start = path;
-	char* end = start + strlen(path);
+	char* end = start + strlen(path) - 1;
 	
 	while (end > path && *end == '/') {
 		end--;
@@ -734,9 +732,15 @@ void path_completer(char* command, char* path) {
 		*(basename - 1) = '\0';
 	}
 	
+	if (strlen(dirname) == 0) {
+		dirname = "/";
+	}
+	
 	path_completer_basename = basename;
 	path_completer_dirname = dirname;
 	path_completer_fd = 0;
 	
-	prompt_generic_complete(path, path_completer_first, path_completer_next, NULL, path_completer_tostring);
+	printf("completer(%s, %s)\n", basename, dirname);
+	
+	prompt_generic_complete(argv, path_completer_first, path_completer_next, NULL, path_completer_tostring);
 }
