@@ -372,14 +372,22 @@ typedef void*(completer_next_item)(void*);
 typedef void(completer_item_to_string)(void*, char*, int);
 
 void prompt_generic_complete(char* argv, completer_first first, completer_next_item next, void* last, completer_item_to_string tostring) {
+	/*
+	 * Technically, we should be able to call tostring on the same
+	 * "handle" at any time and get the same result, but unfortunately
+	 * that doesn't work for dirents, so instead of remembering the exact
+	 * item that we've matched, in all cases we just remember what the
+	 * item stringified to (and recall that instead).
+	 */
+	
 	char buf[40] = { 0 };
 	
-	void* max = NULL;
+	char maxbuf[40] = { 0 };
 	int maxlen = 0;
 	
 	int arglen = strlen(argv);
 	
-	void* match = NULL;
+	char matchbuf[40] = { 0 };
 	int matches = 0;
 	
 	void* p = first();
@@ -392,11 +400,14 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		int len = strlen(buf);
 		
 		if (len >= arglen && strncmp(argv, buf, arglen) == 0) {
-			match = p;
 			matches++;
 			
+			if (matches == 1) {
+				memcpy(matchbuf, buf, sizeof(buf));
+			}
+			
 			if (len > maxlen) {
-				max = p;
+				memcpy(maxbuf, buf, sizeof(buf));
 				maxlen = len;
 			}
 		}
@@ -411,12 +422,8 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		/*
 		 * Single match, just complete it.
 		 */
-		 
-		char buf[40] = { 0 };
-	
-		tostring(match, buf, sizeof(buf));
 		
-		char* remainder = buf + arglen;
+		char* remainder = matchbuf + arglen;
 		int rlen = strlen(remainder);
 		
 		printf("%s", remainder);
@@ -432,12 +439,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		 * the few characters of difference.
 		 */
 		
-		char prefixbuf[40] = { 0 };
-		
-		if (max != NULL) {
-			tostring(max, prefixbuf, sizeof(prefixbuf));
-		}
-		
+		char* prefixbuf = maxbuf;
 		int prefixlen = strlen(prefixbuf);
 		
 		int column = 0;
@@ -484,7 +486,7 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 		printf("\n");
 		prompt_reprint();
 		
-		if (prefixlen != 0) {
+		if (prefixlen != 0 && prefixlen > arglen) {
 			char* remainder = prefixbuf + arglen;
 			int rlen = prefixlen - arglen;
 			
@@ -678,28 +680,30 @@ static void* path_completer_first() {
 	
 	path_completer_fd = open(path_completer_dirname, O_RDONLY);
 	
+	//printf("pcf\n");
+	
 	return path_completer_next(NULL);
 }
 
 static void path_completer_tostring(void* rawlast, char* out, int len) {
 	struct dirent* entry = rawlast;
 	//char path[128];
-	struct stat sb = { 0 };
+	//struct stat sb = { 0 };
 	
 	if (entry->d_type == 0) {
 		//snprintf(path, 128, "%s%s", path_completer_dirname, entry->d_name);
 		//stat(path, &sb);
 	}
 	else {
-		sb.st_mode = entry->d_type;
+		//sb.st_mode = entry->d_type;
 	}
 	
-	if (S_ISDIR(sb.st_mode)) {
-		snprintf(out, len, "%s%s/", path_completer_dirname, entry->d_name);
-	}
-	else {
+	//if (S_ISDIR(sb.st_mode)) {
+	//	snprintf(out, len, "%s%s/", path_completer_dirname, entry->d_name);
+	//}
+	//else {
 		snprintf(out, len, "%s%s", path_completer_dirname, entry->d_name);
-	}
+	//}
 }
 
 void path_completer(char* command, char* argv) {
@@ -740,7 +744,9 @@ void path_completer(char* command, char* argv) {
 	path_completer_dirname = dirname;
 	path_completer_fd = 0;
 	
-	printf("completer(%s, %s)\n", basename, dirname);
+	//printf("completer(%s, %s)\n", basename, dirname);
 	
 	prompt_generic_complete(argv, path_completer_first, path_completer_next, NULL, path_completer_tostring);
+	
+	//printf("gcom ret\n");
 }
