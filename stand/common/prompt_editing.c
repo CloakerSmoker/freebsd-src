@@ -687,23 +687,35 @@ static void* path_completer_first() {
 
 static void path_completer_tostring(void* rawlast, char* out, int len) {
 	struct dirent* entry = rawlast;
-	//char path[128];
-	//struct stat sb = { 0 };
+	char path[128];
+	struct stat sb = { 0 };
 	
 	if (entry->d_type == 0) {
-		//snprintf(path, 128, "%s%s", path_completer_dirname, entry->d_name);
-		//stat(path, &sb);
+		snprintf(path, 128, "%s%s", path_completer_dirname, entry->d_name);
+		stat(path, &sb);
 	}
 	else {
-		//sb.st_mode = entry->d_type;
+		sb.st_mode = DTTOIF(entry->d_type);
 	}
 	
-	//if (S_ISDIR(sb.st_mode)) {
-	//	snprintf(out, len, "%s%s/", path_completer_dirname, entry->d_name);
-	//}
-	//else {
-		snprintf(out, len, "%s%s", path_completer_dirname, entry->d_name);
-	//}
+	char* oout = out;
+	
+	int dirnamelen = snprintf(out, len, "%s", path_completer_dirname);
+	out += dirnamelen;
+	len -= dirnamelen;
+	
+	if (*(out - 1) != '/') {
+		*out++ = '/';
+	}
+	
+	if (S_ISDIR(sb.st_mode)) {
+		snprintf(out, len, "%s/", entry->d_name);
+	}
+	else {
+		snprintf(out, len, "%s", entry->d_name);
+	}
+	
+	printf("(%s) ", oout);
 }
 
 void path_completer(char* command, char* argv) {
@@ -714,27 +726,14 @@ void path_completer(char* command, char* argv) {
 		path[0] = '/';
 	}
 	
-	char* start = path;
-	char* end = start + strlen(path) - 1;
+	char* dirname = path;
+	char* basename = path + strlen(path);
 	
-	while (end > path && *end == '/') {
-		end--;
+	while (basename > dirname && *(basename - 1) != '/') {
+		basename--;
 	}
 	
-	char* dirname = start;
-	char* basename = end;
-	
-	if (end == start && *start == '/') {
-		dirname = "/";
-		basename = "";
-	}
-	else {
-		while (basename > dirname && *(basename - 1) != '/') {
-			basename--;
-		}
-		
-		*(basename - 1) = '\0';
-	}
+	*(basename - 1) = '\0';
 	
 	if (strlen(dirname) == 0) {
 		dirname = "/";
@@ -744,7 +743,7 @@ void path_completer(char* command, char* argv) {
 	path_completer_dirname = dirname;
 	path_completer_fd = 0;
 	
-	//printf("completer(%s, %s)\n", basename, dirname);
+	printf("completer(%s, %s)\n", dirname, basename);
 	
 	prompt_generic_complete(argv, path_completer_first, path_completer_next, NULL, path_completer_tostring);
 	
