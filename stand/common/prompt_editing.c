@@ -664,13 +664,7 @@ const char* path_completer_basename;
 int path_completer_fd;
 
 static void* path_completer_next(void* raw) {
-	struct dirent* entry;	
-	
-	if ((entry = readdirfd(path_completer_fd)) == NULL) {
-		return NULL;
-	}
-	
-	return entry;
+	return readdirfd(path_completer_fd);
 }
 
 static void* path_completer_first() {
@@ -679,8 +673,6 @@ static void* path_completer_first() {
 	}
 	
 	path_completer_fd = open(path_completer_dirname, O_RDONLY);
-	
-	//printf("pcf\n");
 	
 	return path_completer_next(NULL);
 }
@@ -698,24 +690,22 @@ static void path_completer_tostring(void* rawlast, char* out, int len) {
 		sb.st_mode = DTTOIF(entry->d_type);
 	}
 	
-	char* oout = out;
-	
 	int dirnamelen = snprintf(out, len, "%s", path_completer_dirname);
 	out += dirnamelen;
 	len -= dirnamelen;
 	
 	if (*(out - 1) != '/') {
 		*out++ = '/';
+		len--;
 	}
+	
+	char* fmt = "%s";
 	
 	if (S_ISDIR(sb.st_mode)) {
-		snprintf(out, len, "%s/", entry->d_name);
-	}
-	else {
-		snprintf(out, len, "%s", entry->d_name);
+		fmt = "%s/";
 	}
 	
-	printf("(%s) ", oout);
+	snprintf(out, len, fmt, entry->d_name);
 }
 
 void path_completer(char* command, char* argv) {
@@ -743,9 +733,5 @@ void path_completer(char* command, char* argv) {
 	path_completer_dirname = dirname;
 	path_completer_fd = 0;
 	
-	printf("completer(%s, %s)\n", dirname, basename);
-	
 	prompt_generic_complete(argv, path_completer_first, path_completer_next, NULL, path_completer_tostring);
-	
-	//printf("gcom ret\n");
 }
