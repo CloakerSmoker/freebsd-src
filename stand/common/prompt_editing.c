@@ -659,38 +659,27 @@ void predefined_action_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, predef_first, predef_next, NULL, predef_tostring);
 }
 
-const char* path_completer_dirname;
-const char* path_completer_basename;
-int path_completer_fd;
+static const char* path_dirname;
+static int path_fd;
 
-static void* path_completer_next(void* raw) {
-	return readdirfd(path_completer_fd);
+static void* path_next(void* raw) {
+	return readdirfd(path_fd);
 }
 
-static void* path_completer_first() {
-	if (path_completer_fd) {
-		close(path_completer_fd);
+static void* path_first() {
+	if (path_fd) {
+		close(path_fd);
 	}
 	
-	path_completer_fd = open(path_completer_dirname, O_RDONLY);
+	path_fd = open(path_dirname, O_RDONLY);
 	
-	return path_completer_next(NULL);
+	return path_next(NULL);
 }
 
-static void path_completer_tostring(void* rawlast, char* out, int len) {
+static void path_tostring(void* rawlast, char* out, int len) {
 	struct dirent* entry = rawlast;
-	char path[128];
-	struct stat sb = { 0 };
 	
-	if (entry->d_type == 0) {
-		snprintf(path, 128, "%s%s", path_completer_dirname, entry->d_name);
-		stat(path, &sb);
-	}
-	else {
-		sb.st_mode = DTTOIF(entry->d_type);
-	}
-	
-	int dirnamelen = snprintf(out, len, "%s", path_completer_dirname);
+	int dirnamelen = snprintf(out, len, "%s", path_dirname);
 	out += dirnamelen;
 	len -= dirnamelen;
 	
@@ -701,7 +690,7 @@ static void path_completer_tostring(void* rawlast, char* out, int len) {
 	
 	char* fmt = "%s";
 	
-	if (S_ISDIR(sb.st_mode)) {
+	if ((entry->d_type & DT_DIR) && strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..")) {
 		fmt = "%s/";
 	}
 	
@@ -729,9 +718,8 @@ void path_completer(char* command, char* argv) {
 		dirname = "/";
 	}
 	
-	path_completer_basename = basename;
-	path_completer_dirname = dirname;
-	path_completer_fd = 0;
+	path_dirname = dirname;
+	path_fd = 0;
 	
-	prompt_generic_complete(argv, path_completer_first, path_completer_next, NULL, path_completer_tostring);
+	prompt_generic_complete(argv, path_first, path_next, NULL, path_tostring);
 }
