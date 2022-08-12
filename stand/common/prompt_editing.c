@@ -659,6 +659,15 @@ void predefined_action_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, predef_first, predef_next, NULL, predef_tostring);
 }
 
+/*
+ * Path completion doesn't fit into the first/next/tostring model super well,
+ * since we're working with an fd which contains its own state. Plus, since
+ * first() gets called twice, we need to have it reset the internal state of that
+ * fd so we can read all dirents again.
+ * In practice, this just means we need to remember the fd, and the name of the
+ * fd so it can be reopened.
+ */
+
 static const char* path_dirname;
 static int path_fd;
 
@@ -667,7 +676,7 @@ static void* path_next(void* raw) {
 }
 
 static void* path_first() {
-	if (path_fd) {
+	if (path_fd > 0) {
 		close(path_fd);
 	}
 	
@@ -679,6 +688,13 @@ static void* path_first() {
 static void path_tostring(void* rawlast, char* out, int len) {
 	struct dirent* entry = rawlast;
 	
+	/*
+	 * We need to ensure that path_dirname contains a path with a trailing "/"
+	 * otherwise we'll spit out a bunch of garbage that can't be completed.
+	 * In practice, the only path *with* a trailing "/" is going to be "/"
+	 * itself since our dirname/basename split will always destroy the last "/".
+	 */
+	
 	int dirnamelen = snprintf(out, len, "%s", path_dirname);
 	out += dirnamelen;
 	len -= dirnamelen;
@@ -687,6 +703,12 @@ static void path_tostring(void* rawlast, char* out, int len) {
 		*out++ = '/';
 		len--;
 	}
+	
+	/*
+	 * We also want to show directories (not "." and ".." though) with a trailing
+	 * "/" so they can be completed as a whole, and then any of their entries
+	 * can also be completed with minimal typing.
+	 */
 	
 	char* fmt = "%s";
 	
@@ -698,6 +720,16 @@ static void path_tostring(void* rawlast, char* out, int len) {
 }
 
 void path_completer(char* command, char* argv) {
+	/*
+	 * We want to split argv into a dirname/basename pair, so we can check each
+	 * entry inside of dirname if it matches the prefix basename.
+	 * So, we just need to find the last "/" in argv, and replace it with a null
+	 * terminator. Then ("/" + 1) is our basename, and argv is our dirname.
+	 * However, since path_tostring gives us an absolute path, we actually need
+	 * to throw away the basename and match against the (already absolute)
+	 * path in argv, which is why we operate on the copy "path" instead.
+	 */
+	
 	char path[128] = { 0 };
 	snprintf(path, 128, "%s", argv);
 	
