@@ -66,19 +66,6 @@ struct {
 	{"smart-complete", prompt_complete_smart}
 };
 
-struct {
-	char* name;
-	int argn;
-	prompt_completer completer;
-} prompt_completers[] = {
-	{"keybind", 2, predefined_action_completer},
-	{"keyunbind", 1, keyunbind_completer},
-	{"show", 1, environ_completer},
-	{"set", 1, environ_completer},
-	{"unset", 1, environ_completer},
-	{"ls", 1, path_completer}
-};
-
 /*
  * Interactive mode
  */
@@ -95,8 +82,12 @@ interact(void)
 		prompt_register_action(prompt_predefined_actions[i].name, prompt_predefined_actions[i].action);
 	}
 	
-	for (i = 0; i < (sizeof(prompt_completers) / sizeof(prompt_completers[0])); i++) {
-		prompt_register_completer(prompt_completers[i].name, prompt_completers[i].argn, prompt_completers[i].completer);
+	prompt_completion_entry** pce;
+	
+	SET_FOREACH(pce, Xcompleter_set) {
+		prompt_completion_entry* e = *pce;
+		
+		prompt_register_completer(e->command, e->argn, e->completer);
 	}
 	
 	/*

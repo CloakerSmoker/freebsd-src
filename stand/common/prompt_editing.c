@@ -523,22 +523,22 @@ void prompt_complete_command(void* data) {
 	prompt_generic_complete(LINE, command_first, command_next, (void*)-1, command_tostring);
 }
 
-struct prompt_completer_entry {
-	char* command;
-	int argc;
+struct completer_entry {
+	const char* command;
+	int argn;
 	prompt_completer completer;
 	
-	STAILQ_ENTRY(prompt_completer_entry) next;
+	STAILQ_ENTRY(completer_entry) next;
 };
 
-STAILQ_HEAD(prompt_completers, prompt_completer_entry) prompt_completers_head =
+STAILQ_HEAD(prompt_completers, completer_entry) prompt_completers_head =
 	 STAILQ_HEAD_INITIALIZER(prompt_completers_head);
 
-void prompt_register_completer(char* command, int argc, prompt_completer completer) {
-	struct prompt_completer_entry* entry = malloc(sizeof(struct prompt_completer_entry));
+void prompt_register_completer(const char* command, int argn, prompt_completer completer) {
+	struct completer_entry* entry = malloc(sizeof(struct completer_entry));
 	
 	entry->command = command;
-	entry->argc = argc;
+	entry->argn = argn;
 	entry->completer = completer;
 	
 	STAILQ_INSERT_TAIL(&prompt_completers_head, entry, next);
@@ -588,11 +588,11 @@ void prompt_complete_smart(void* data) {
 		argc++;
 	}
 	
-	struct prompt_completer_entry* entry = NULL;
-	struct prompt_completer_entry* e;
+	struct completer_entry* entry = NULL;
+	struct completer_entry* e;
 	
 	STAILQ_FOREACH(e, &prompt_completers_head, next) {
-		if (strcmp(e->command, command) == 0 && e->argc == argc) {
+		if (strcmp(e->command, command) == 0 && e->argn == argc) {
 			entry = e;
 			break;
 		}
@@ -755,3 +755,10 @@ void path_completer(char* command, char* argv) {
 	
 	prompt_generic_complete(argv, path_first, path_next, NULL, path_tostring);
 }
+
+COMPLETION_SET(keybind, 2, predefined_action_completer);
+COMPLETION_SET(keyunbind, 1, keyunbind_completer);
+COMPLETION_SET(show, 1, environ_completer);
+COMPLETION_SET(set, 1, environ_completer);
+COMPLETION_SET(unset, 1, environ_completer);
+COMPLETION_SET(ls, 1, path_completer);

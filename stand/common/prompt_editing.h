@@ -69,7 +69,7 @@ struct prompt_history_entry* prompt_history_next(struct prompt_history_entry*);
 
 typedef void(*prompt_completer)(char*, char*);
 
-void prompt_register_completer(char*, int, prompt_completer);
+void prompt_register_completer(const char*, int, prompt_completer);
 void prompt_complete_command(void*);
 void prompt_complete_smart(void*);
 
@@ -77,3 +77,15 @@ void keyunbind_completer(char*, char*);
 void environ_completer(char*, char*);
 void predefined_action_completer(char*, char*);
 void path_completer(char*, char*);
+
+typedef struct {
+	const char* command;
+	int argn;
+	prompt_completer completer;
+} prompt_completion_entry;
+
+#define COMPLETION_SET(command, argn, func) \
+	static prompt_completion_entry _completer_ ## command ## argn = { #command, argn, func }; \
+	DATA_SET(Xcompleter_set, _completer_ ## command ## argn)
+
+SET_DECLARE(Xcompleter_set, prompt_completion_entry);
