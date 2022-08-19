@@ -78,64 +78,6 @@ void prompt_rawinput(char in) {
 	prompt_show_aftergap();
 }
 
-void prompt_forward_char(void* data) {
-	if (GAP != PROMPT_LINE_LENGTH) {
-		LINE[CURSOR++] = LINE[GAP++];
-		
-		printf("\x1b[1C");
-	}
-}
-void prompt_backward_char(void* data) {
-	if (CURSOR != 0) {
-		LINE[--GAP] = LINE[--CURSOR];
-		
-		printf("\x1b[1D");
-	}
-}
-
-void prompt_delete_backward_char(void* data)
-{
-	if (CURSOR != 0) {
-		LINE[--CURSOR] = '\0';
-		
-		putchar('\b');
-		
-		prompt_show_aftergap();
-	}
-};
-
-void prompt_delete_forward_char(void* data)
-{
-	if (GAP != PROMPT_LINE_LENGTH) {
-		LINE[GAP++] = '\0';
-		
-		prompt_show_aftergap();
-	}
-};
-
-void prompt_move_end_of_line(void* data) {
-	int gapsize = PROMPT_LINE_LENGTH - GAP;
-	
-	if (gapsize != 0) {
-		printf("\x1b[%iC", gapsize);
-		
-		for (int i = 0; i < gapsize; i++) {
-			LINE[CURSOR++] = LINE[GAP++];
-		}
-	}
-}
-void prompt_move_beginning_of_line(void* data) {
-	int cursorsize = CURSOR;
-	
-	if (cursorsize != 0) {
-		printf("\x1b[%iD", cursorsize);
-		
-		for (int i = 0; i < cursorsize; i++) {
-			LINE[--GAP] = LINE[--CURSOR];
-		}
-	}
-}
-
 char* prompt_getline() {
 	/*
 	 * To get a whole line, we just need to move GAP to the end of the line
@@ -157,6 +99,76 @@ char* prompt_getline() {
 	
 	return LINE;
 }
+
+void prompt_forward_char(void* data) {
+	if (GAP != PROMPT_LINE_LENGTH) {
+		LINE[CURSOR++] = LINE[GAP++];
+		
+		printf("\x1b[1C");
+	}
+}
+
+PREDEF_ACTION_SET("forward-char", prompt_forward_char);
+
+void prompt_backward_char(void* data) {
+	if (CURSOR != 0) {
+		LINE[--GAP] = LINE[--CURSOR];
+		
+		printf("\x1b[1D");
+	}
+}
+
+PREDEF_ACTION_SET("backward-char", prompt_backward_char);
+
+void prompt_delete_backward_char(void* data) {
+	if (CURSOR != 0) {
+		LINE[--CURSOR] = '\0';
+		
+		putchar('\b');
+		
+		prompt_show_aftergap();
+	}
+}
+
+PREDEF_ACTION_SET("delete-backward-char", prompt_delete_backward_char);
+
+void prompt_delete_forward_char(void* data) {
+	if (GAP != PROMPT_LINE_LENGTH) {
+		LINE[GAP++] = '\0';
+		
+		prompt_show_aftergap();
+	}
+}
+
+PREDEF_ACTION_SET("delete-forward-char", prompt_delete_forward_char);
+
+void prompt_move_end_of_line(void* data) {
+	int gapsize = PROMPT_LINE_LENGTH - GAP;
+	
+	if (gapsize != 0) {
+		printf("\x1b[%iC", gapsize);
+		
+		for (int i = 0; i < gapsize; i++) {
+			LINE[CURSOR++] = LINE[GAP++];
+		}
+	}
+}
+
+PREDEF_ACTION_SET("move-end-of-line", prompt_move_end_of_line);
+
+void prompt_move_beginning_of_line(void* data) {
+	int cursorsize = CURSOR;
+	
+	if (cursorsize != 0) {
+		printf("\x1b[%iD", cursorsize);
+		
+		for (int i = 0; i < cursorsize; i++) {
+			LINE[--GAP] = LINE[--CURSOR];
+		}
+	}
+}
+
+PREDEF_ACTION_SET("move-beginning-of-line", prompt_move_beginning_of_line);
 
 static int count_forward_word() {
 	/*
@@ -197,6 +209,8 @@ void prompt_forward_word(void* data) {
 	}
 }
 
+PREDEF_ACTION_SET("forward-word", prompt_forward_word);
+
 void prompt_backward_word(void* data) {
 	int run = count_backward_word();
 	
@@ -208,6 +222,8 @@ void prompt_backward_word(void* data) {
 		printf("\x1b[%iD", run);
 	}
 }
+
+PREDEF_ACTION_SET("backward-word", prompt_backward_word);
 
 void prompt_yank(void* data) {
 	/*
@@ -225,6 +241,8 @@ void prompt_yank(void* data) {
 	}
 }
 
+PREDEF_ACTION_SET("yank", prompt_yank);
+
 void prompt_forward_kill_word(void* data) {
 	int run = count_forward_word();
 	
@@ -240,6 +258,8 @@ void prompt_forward_kill_word(void* data) {
 		prompt_show_aftergap();
 	}
 }
+
+PREDEF_ACTION_SET("kill-word", prompt_forward_kill_word);
 
 void prompt_backward_kill_word(void* data) {
 	int run = count_backward_word();
@@ -258,6 +278,8 @@ void prompt_backward_kill_word(void* data) {
 		prompt_show_aftergap();
 	}
 }
+
+PREDEF_ACTION_SET("backward-kill-word", prompt_backward_kill_word);
 
 void prompt_kill_line(void* data) {
 	prompt_move_beginning_of_line(NULL);
@@ -278,6 +300,8 @@ void prompt_kill_line(void* data) {
 		prompt_show_aftergap();
 	}
 }
+
+PREDEF_ACTION_SET("kill-line", prompt_kill_line);
 
 void prompt_recall_history(struct prompt_history_entry* entry) {
 	/*
@@ -307,6 +331,9 @@ void prompt_next_history_element(void* data) {
 	
 	prompt_recall_history(HISTORYCURSOR);
 }
+
+PREDEF_ACTION_SET("next-history-element", prompt_next_history_element);
+
 void prompt_previous_history_element(void* data) {
 	/*
 	 * "previous-history-element" at the start of history starts at the most
@@ -323,22 +350,11 @@ void prompt_previous_history_element(void* data) {
 	prompt_recall_history(HISTORYCURSOR);
 }
 
-PREDEF_ACTION_SET("backward-char", prompt_backward_char);
-PREDEF_ACTION_SET("forward-char", prompt_forward_char);
-PREDEF_ACTION_SET("move-end-of-line", prompt_move_end_of_line);
-PREDEF_ACTION_SET("move-beginning-of-line", prompt_move_beginning_of_line);
-PREDEF_ACTION_SET("delete-backward-char", prompt_delete_backward_char);
-PREDEF_ACTION_SET("delete-forward-char", prompt_delete_forward_char);
-PREDEF_ACTION_SET("forward-word", prompt_forward_word);
-PREDEF_ACTION_SET("backward-word", prompt_backward_word);
-PREDEF_ACTION_SET("yank", prompt_yank);
-PREDEF_ACTION_SET("kill-word", prompt_forward_kill_word);
-PREDEF_ACTION_SET("backward-kill-word", prompt_backward_kill_word);
-PREDEF_ACTION_SET("kill-line", prompt_kill_line);
-PREDEF_ACTION_SET("next-history-element", prompt_next_history_element);
 PREDEF_ACTION_SET("previous-history-element", prompt_previous_history_element);
-PREDEF_ACTION_SET("command-complete", prompt_complete_command);
-PREDEF_ACTION_SET("smart-complete", prompt_complete_smart);
+
+/*
+ * History command/Lua interface
+ */
 
 void prompt_history_add(const char* line, int len) {
 	struct prompt_history_entry* entry = malloc(sizeof(struct prompt_history_entry));
@@ -381,6 +397,10 @@ command_history(int argc, char *argv[])
 	
 	return 0;
 }
+
+/*
+ * Completion logic
+ */
 
 #define PROMPT_COLUMNS 80
 
@@ -514,6 +534,10 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 	}
 }
 
+/*
+ * Command completer
+ */
+
 static void* command_first() {
 	return SET_BEGIN(Xcommand_set);
 }
@@ -534,26 +558,11 @@ void prompt_complete_command(void* data) {
 	prompt_generic_complete(LINE, command_first, command_next, SET_LIMIT(Xcommand_set), command_tostring);
 }
 
-struct completer_entry {
-	const char* command;
-	int argn;
-	prompt_completer completer;
-	
-	STAILQ_ENTRY(completer_entry) next;
-};
+PREDEF_ACTION_SET("command-complete", prompt_complete_command);
 
-STAILQ_HEAD(prompt_completers, completer_entry) prompt_completers_head =
-	 STAILQ_HEAD_INITIALIZER(prompt_completers_head);
-
-void prompt_register_completer(const char* command, int argn, prompt_completer completer) {
-	struct completer_entry* entry = malloc(sizeof(struct completer_entry));
-	
-	entry->command = command;
-	entry->argn = argn;
-	entry->completer = completer;
-	
-	STAILQ_INSERT_TAIL(&prompt_completers_head, entry, next);
-}
+/*
+ * "smart"/context sensitive completer
+ */
 
 void prompt_complete_smart(void* data) {
 	/*
@@ -585,6 +594,7 @@ void prompt_complete_smart(void* data) {
 	/*
 	 * Find the number and text of the last/most recent argument so the completer
 	 * has enough context to actually complete the argument.
+	 * Doesn't need to be bulletproof since we only need the last arg, and the count.
 	 */
 	
 	int argc = 1;
@@ -595,28 +605,48 @@ void prompt_complete_smart(void* data) {
 		*next = '\0';
 		last = next + 1;
 		
-		next = strpbrk(next, "\t\f\v ");
+		next = strpbrk(last, "\t\f\v ");
 		argc++;
 	}
 	
-	struct completer_entry* entry = NULL;
-	struct completer_entry* e;
+	/*
+	 * There's two mechanisms to "glob" completion, either a "*" command which
+	 * matches any command name, or a "0" arg index, which matches any argument
+	 * number.
+	 */
 	
-	STAILQ_FOREACH(e, &prompt_completers_head, next) {
-		if (strcmp(e->command, command) == 0 && e->argn == argc) {
+	prompt_completion_entry* entry = NULL;
+	prompt_completion_entry* wildcard = NULL;
+	
+	prompt_completion_entry** pce;
+	SET_FOREACH(pce, Xcompleter_set) {
+		prompt_completion_entry* e = *pce;
+		
+		if (strcmp(e->command, command) == 0 && (e->argn == 0 || e->argn == argc)) {
 			entry = e;
-			break;
+		}
+		else if (strcmp(e->command, "*") == 0) {
+			wildcard = e;
 		}
 	}
 	
 	LINE[cmdlen] = old;
 	
 	if (entry == NULL) {
-		return;
+		if (wildcard != NULL) {
+			wildcard->completer(command, last);
+		}
 	}
-	
-	entry->completer(command, last);
+	else {
+		entry->completer(command, last);
+	}
 }
+
+PREDEF_ACTION_SET("smart-complete", prompt_complete_smart);
+
+/*
+ * Misc completers, some command-specific, some generic
+ */
 
 static void* keybind_first() {
 	return (void*)prompt_first_binding();
@@ -633,6 +663,8 @@ static void keybind_tostring(void* raw, char* out, int len) {
 void keyunbind_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, keybind_first, keybind_next, NULL, keybind_tostring);
 }
+
+COMPLETION_SET(keybind, 2, predefined_action_completer);
 
 static void* environ_first() {
 	return environ;
@@ -651,6 +683,10 @@ static void environ_tostring(void* raw, char* out, int len) {
 void environ_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, environ_first, environ_next, NULL, environ_tostring);
 }
+
+COMPLETION_SET(show, 1, environ_completer);
+COMPLETION_SET(set, 1, environ_completer);
+COMPLETION_SET(unset, 1, environ_completer);
 
 static void* predef_first() {
 	return SET_BEGIN(Xpredef_action_set);
@@ -767,9 +803,4 @@ void path_completer(char* command, char* argv) {
 	prompt_generic_complete(argv, path_first, path_next, NULL, path_tostring);
 }
 
-COMPLETION_SET(keybind, 2, predefined_action_completer);
-COMPLETION_SET(keyunbind, 1, keyunbind_completer);
-COMPLETION_SET(show, 1, environ_completer);
-COMPLETION_SET(set, 1, environ_completer);
-COMPLETION_SET(unset, 1, environ_completer);
-COMPLETION_SET(ls, 1, path_completer);
+COMPLETION_SET(ls, 0, path_completer);

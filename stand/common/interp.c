@@ -55,13 +55,6 @@ interact(void)
 
 	TSENTER();
 	
-	prompt_completion_entry** pce;
-	SET_FOREACH(pce, Xcompleter_set) {
-		prompt_completion_entry* e = *pce;
-		
-		prompt_register_completer(e->command, e->argn, e->completer);
-	}
-	
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
 	 * the compiler as it's considered an externally observable event.  This

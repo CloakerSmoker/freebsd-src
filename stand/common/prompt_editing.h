@@ -67,11 +67,10 @@ struct prompt_history_entry* prompt_history_next(struct prompt_history_entry*);
  * Completion
  */
 
-typedef void(*prompt_completer)(char*, char*);
-
-void prompt_register_completer(const char*, int, prompt_completer);
 void prompt_complete_command(void*);
 void prompt_complete_smart(void*);
+
+typedef void(*prompt_completer)(char*, char*);
 
 void keyunbind_completer(char*, char*);
 void environ_completer(char*, char*);
