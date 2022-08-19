@@ -488,42 +488,20 @@ prompt_add_stroke_binding(char* stroke, prompt_action action) {
  * Still useful for Lua though, since otherwise Lua would need to manually
  * implement every editing option instead of just using the predefined ones.
  *
- * Lua will "freeze" prompt_actions_head into "keybind.actions" when it is started.
- * Since predefined actions shouldn't be added at runtime, this should be fine.
+ * Lua translates Xpredef_action_set into the keybind.actions table at runtime
+ * and then each entry in keybind.actions can be passed to keybind.register to
+ * accomplish the same as the simp "keybind" command.
  */
-
-STAILQ_HEAD(prompt_actions, prompt_predefined_action) prompt_actions_head =
-	 STAILQ_HEAD_INITIALIZER(prompt_actions_head);
-
-struct prompt_predefined_action*
-prompt_first_action() {
-	return STAILQ_FIRST(&prompt_actions_head);
-}
-
-struct prompt_predefined_action* 
-prompt_next_action(struct prompt_predefined_action* current) {
-	return STAILQ_NEXT(current, next);
-}
-
-struct prompt_predefined_action* 
-prompt_register_action(char* name, prompt_action action) {
-	struct prompt_predefined_action* result = malloc(sizeof(struct prompt_predefined_action));
-	
-	result->name = name;
-	result->action = action;
-	
-	STAILQ_INSERT_TAIL(&prompt_actions_head, result, next);
-	
-	return result;
-}
 
 static struct prompt_predefined_action*
 find_predef_by_name(char* name) {
-	struct prompt_predefined_action* p;
+	struct prompt_predefined_action** ppa;
 	
-	STAILQ_FOREACH(p, &prompt_actions_head, next) {
-		if (strcmp(p->name, name) == 0)
-			return p;
+	SET_FOREACH(ppa, Xpredef_action_set) {
+		struct prompt_predefined_action* a = *ppa;
+		
+		if (strcmp(a->name, name) == 0)
+			return a;
 	}
 	
 	return NULL;
@@ -531,11 +509,13 @@ find_predef_by_name(char* name) {
 
 static struct prompt_predefined_action*
 find_predef_by_action(prompt_action action) {
-	struct prompt_predefined_action* p;
+	struct prompt_predefined_action** ppa;
 	
-	STAILQ_FOREACH(p, &prompt_actions_head, next) {
-		if (p->action == action)
-			return p;
+	SET_FOREACH(ppa, Xpredef_action_set) {
+		struct prompt_predefined_action* a = *ppa;
+		
+		if (a->action == action)
+			return a;
 	}
 	
 	return NULL;

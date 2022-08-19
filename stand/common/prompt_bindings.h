@@ -64,6 +64,8 @@ struct prompt_input prompt_parse_stroke(const char*);
 struct prompt_keybind* prompt_first_binding();
 struct prompt_keybind* prompt_next_binding(struct prompt_keybind*);
 
-struct prompt_predefined_action* prompt_first_action();
-struct prompt_predefined_action* prompt_next_action(struct prompt_predefined_action*);
-struct prompt_predefined_action* prompt_register_action(char*, prompt_action);
+#define PREDEF_ACTION_SET(name, func) \
+	static struct prompt_predefined_action _predef_ ## func = { name, func }; \
+	DATA_SET(Xpredef_action_set, _predef_ ## func)
+
+SET_DECLARE(Xpredef_action_set, struct prompt_predefined_action);
