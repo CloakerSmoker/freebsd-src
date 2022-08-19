@@ -44,28 +44,6 @@ __FBSDID("$FreeBSD$");
 
 struct prompt_buffer prompt_prompt = { 0 };
 
-struct {
-	char* name;
-	prompt_action action;
-} prompt_predefined_actions[] = {
-	{"backward-char", prompt_backward_char},
-	{"forward-char", prompt_forward_char},
-	{"move-end-of-line", prompt_move_end_of_line},
-	{"move-beginning-of-line", prompt_move_beginning_of_line},
-	{"delete-backward-char", prompt_delete_backward_char},
-	{"delete-forward-char", prompt_delete_forward_char},
-	{"forward-word", prompt_forward_word},
-	{"backward-word", prompt_backward_word},
-	{"yank", prompt_yank},
-	{"kill-word", prompt_forward_kill_word},
-	{"backward-kill-word", prompt_backward_kill_word},
-	{"kill-line", prompt_kill_line},
-	{"next-history-element", prompt_next_history_element},
-	{"previous-history-element", prompt_previous_history_element},
-	{"command-complete", prompt_complete_command},
-	{"smart-complete", prompt_complete_smart}
-};
-
 /*
  * Interactive mode
  */
@@ -74,16 +52,10 @@ interact(void)
 {
 	static char		input[256];		/* big enough? */
 	const char * volatile	interp_identifier;
-	int i;
 
 	TSENTER();
 	
-	for (i = 0; i < (sizeof(prompt_predefined_actions) / sizeof(prompt_predefined_actions[0])); i++) {
-		prompt_register_action(prompt_predefined_actions[i].name, prompt_predefined_actions[i].action);
-	}
-	
 	prompt_completion_entry** pce;
-	
 	SET_FOREACH(pce, Xcompleter_set) {
 		prompt_completion_entry* e = *pce;
 		

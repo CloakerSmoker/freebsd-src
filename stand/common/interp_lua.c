@@ -287,16 +287,16 @@ luaopen_keybind(lua_State *L)
 	lua_newtable(L);
 	
 	/*
-	 * Build keybind.actions out of the list of registered predefined actions
+	 * Build keybind.actions out of the list of predefined actions
 	 */
+	 
+	struct prompt_predefined_action** ppa;
 	
-	struct prompt_predefined_action* current = prompt_first_action();
-	
-	while (current != NULL) {
-		lua_pushlightuserdata(L, current);
-		lua_setfield(L, -2, current->name);
+	SET_FOREACH(ppa, Xpredef_action_set) {
+		struct prompt_predefined_action* a = *ppa;
 		
-		current = prompt_next_action(current);
+		lua_pushlightuserdata(L, a);
+		lua_setfield(L, -2, a->name);
 	}
 	
 	lua_setfield(L, -2, "actions");

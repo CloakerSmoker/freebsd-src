@@ -323,6 +323,23 @@ void prompt_previous_history_element(void* data) {
 	prompt_recall_history(HISTORYCURSOR);
 }
 
+PREDEF_ACTION_SET("backward-char", prompt_backward_char);
+PREDEF_ACTION_SET("forward-char", prompt_forward_char);
+PREDEF_ACTION_SET("move-end-of-line", prompt_move_end_of_line);
+PREDEF_ACTION_SET("move-beginning-of-line", prompt_move_beginning_of_line);
+PREDEF_ACTION_SET("delete-backward-char", prompt_delete_backward_char);
+PREDEF_ACTION_SET("delete-forward-char", prompt_delete_forward_char);
+PREDEF_ACTION_SET("forward-word", prompt_forward_word);
+PREDEF_ACTION_SET("backward-word", prompt_backward_word);
+PREDEF_ACTION_SET("yank", prompt_yank);
+PREDEF_ACTION_SET("kill-word", prompt_forward_kill_word);
+PREDEF_ACTION_SET("backward-kill-word", prompt_backward_kill_word);
+PREDEF_ACTION_SET("kill-line", prompt_kill_line);
+PREDEF_ACTION_SET("next-history-element", prompt_next_history_element);
+PREDEF_ACTION_SET("previous-history-element", prompt_previous_history_element);
+PREDEF_ACTION_SET("command-complete", prompt_complete_command);
+PREDEF_ACTION_SET("smart-complete", prompt_complete_smart);
+
 void prompt_history_add(const char* line, int len) {
 	struct prompt_history_entry* entry = malloc(sizeof(struct prompt_history_entry));
 	memcpy(entry->line, line, len);
@@ -498,29 +515,23 @@ void prompt_generic_complete(char* argv, completer_first first, completer_next_i
 }
 
 static void* command_first() {
-	return (void*)0;
+	return SET_BEGIN(Xcommand_set);
 }
 static void* command_next(void* rawlast) {
-	long long int index = (long long int)rawlast;
+	struct bootblk_command** pcmd = rawlast;
 	
-	if (index > SET_COUNT(Xcommand_set)) {
-		return (void*)-1;
-	}
-	
-	return (void*)(++index);
+	return (void*)++pcmd;
 }
-static void command_tostring(void* rawindex, char* out, int len) {
-	struct bootblk_command* cmd;
+static void command_tostring(void* rawlast, char* out, int len) {
+	struct bootblk_command** pcmd = rawlast;
 	
-	cmd = SET_ITEM(Xcommand_set, (long long int)rawindex);
-	
-	snprintf(out, len, "%s", cmd->c_name);
+	snprintf(out, len, "%s", (*pcmd)->c_name);
 }
 
 void prompt_complete_command(void* data) {
 	LINE[CURSOR] = 0;
 	
-	prompt_generic_complete(LINE, command_first, command_next, (void*)-1, command_tostring);
+	prompt_generic_complete(LINE, command_first, command_next, SET_LIMIT(Xcommand_set), command_tostring);
 }
 
 struct completer_entry {
@@ -642,21 +653,21 @@ void environ_completer(char* command, char* argv) {
 }
 
 static void* predef_first() {
-	return prompt_first_action();
+	return SET_BEGIN(Xpredef_action_set);
 }
 static void* predef_next(void* rawlast) {
-	struct prompt_predefined_action* p = rawlast;
+	struct prompt_predefined_action** ppa = rawlast;
 	
-	return prompt_next_action(p);
+	return (void*)++ppa;
 }
-static void predef_tostring(void* raw, char* out, int len) {
-	struct prompt_predefined_action* p = raw;
+static void predef_tostring(void* rawlast, char* out, int len) {
+	struct prompt_predefined_action** ppa = rawlast;
 	
-	snprintf(out, len, "%s", p->name);
+	snprintf(out, len, "%s", (*ppa)->name);
 }
 
 void predefined_action_completer(char* command, char* argv) {
-	prompt_generic_complete(argv, predef_first, predef_next, NULL, predef_tostring);
+	prompt_generic_complete(argv, predef_first, predef_next, SET_LIMIT(Xpredef_action_set), predef_tostring);
 }
 
 /*
