@@ -540,3 +540,64 @@ interp_include(const char *filename)
 
 	return (luaL_dofile(softc->luap, filename));
 }
+
+static void dumpstack (lua_State *L) {
+  int top=lua_gettop(L);
+  for (int i=1; i <= top; i++) {
+    printf("%d\t%s\t", i, luaL_typename(L,i));
+    switch (lua_type(L, i)) {
+      case LUA_TNUMBER:
+        printf("%jd\n",(intmax_t)lua_tonumber(L,i));
+        break;
+      case LUA_TSTRING:
+        printf("%s\n",lua_tostring(L,i));
+        break;
+      case LUA_TBOOLEAN:
+        printf("%s\n", (lua_toboolean(L, i) ? "true" : "false"));
+        break;
+      case LUA_TNIL:
+        printf("%s\n", "nil");
+        break;
+      default:
+        printf("%p\n",lua_topointer(L,i));
+        break;
+    }
+  }
+}
+
+static void* variable_first() {
+	lua_State* L = lua_softc.luap;
+	
+	lua_pushglobaltable(L);
+	lua_pushnil(L);
+	return (void*)(long long int)lua_next(L, -2);
+}
+static void* variable_next(void* rawlast) {
+	lua_State* L = lua_softc.luap;
+	
+	return (void*)(long long int)lua_next(L, -2);
+}
+static void variable_tostring(void* rawlast, char* out, int len) {
+	lua_State* L = lua_softc.luap;
+	
+	int isfunction = lua_isfunction(L, -1);
+	lua_pop(L, 1);
+	
+	if (lua_isstring(L, -1)) {
+		lua_pushvalue(L, -1);
+		const char* value = lua_tolstring(L, -1, NULL);
+		lua_pop(L, 1);
+		
+		snprintf(out, len, isfunction ? "%s(" : "%s", value);
+	}
+}
+
+static void lua_completer(char* command, char* argv) {
+	lua_State* L = lua_softc.luap;
+	
+	int top = lua_gettop(L);
+	prompt_generic_complete(argv, variable_first, variable_next, NULL, variable_tostring);
+	lua_settop(L, top);
+}
+
+COMPLETION_SET(_, 0, lua_completer);

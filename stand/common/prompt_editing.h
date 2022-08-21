@@ -70,6 +70,12 @@ struct prompt_history_entry* prompt_history_next(struct prompt_history_entry*);
 void prompt_complete_command(void*);
 void prompt_complete_smart(void*);
 
+typedef void*(generic_completer_first)();
+typedef void*(generic_completer_next_item)(void*);
+typedef void(generic_completer_item_to_string)(void*, char*, int);
+
+void prompt_generic_complete(char*, generic_completer_first, generic_completer_next_item, void*, generic_completer_item_to_string);
+
 typedef void(*prompt_completer)(char*, char*);
 
 void keyunbind_completer(char*, char*);

@@ -404,11 +404,7 @@ command_history(int argc, char *argv[])
 
 #define PROMPT_COLUMNS 80
 
-typedef void*(completer_first)();
-typedef void*(completer_next_item)(void*);
-typedef void(completer_item_to_string)(void*, char*, int);
-
-void prompt_generic_complete(char* argv, completer_first first, completer_next_item next, void* last, completer_item_to_string tostring) {
+void prompt_generic_complete(char* argv, generic_completer_first first, generic_completer_next_item next, void* last, generic_completer_item_to_string tostring) {
 	/*
 	 * Technically, we should be able to call tostring on the same
 	 * "handle" at any time and get the same result, but unfortunately
@@ -576,9 +572,9 @@ void prompt_complete_smart(void* data) {
 	
 	int cmdlen = 0;
 	
-	for (; cmdlen < CURSOR && isgraph(LINE[cmdlen]); cmdlen++);
+	for (; cmdlen < CURSOR && isalnum(LINE[cmdlen]); cmdlen++);
 	
-	if (!isspace(LINE[cmdlen]) || cmdlen == CURSOR) {
+	if (!(isspace(LINE[cmdlen]) || ispunct(LINE[cmdlen])) || cmdlen == CURSOR) {
 		prompt_complete_command(NULL);
 		return;
 	}
@@ -610,9 +606,11 @@ void prompt_complete_smart(void* data) {
 	}
 	
 	/*
-	 * There's two mechanisms to "glob" completion, either a "*" command which
+	 * There's two mechanisms to "glob" completion, either a "_" command which
 	 * matches any command name, or a "0" arg index, which matches any argument
 	 * number.
+	 * Note: * can't be used without adding a "tag" to the COMPLETION_SET macro
+	 * since the command name is directly embedded into an identifier.
 	 */
 	
 	prompt_completion_entry* entry = NULL;
@@ -625,7 +623,7 @@ void prompt_complete_smart(void* data) {
 		if (strcmp(e->command, command) == 0 && (e->argn == 0 || e->argn == argc)) {
 			entry = e;
 		}
-		else if (strcmp(e->command, "*") == 0) {
+		else if (strcmp(e->command, "_") == 0) {
 			wildcard = e;
 		}
 	}
