@@ -541,63 +541,90 @@ interp_include(const char *filename)
 	return (luaL_dofile(softc->luap, filename));
 }
 
-static void dumpstack (lua_State *L) {
-  int top=lua_gettop(L);
-  for (int i=1; i <= top; i++) {
-    printf("%d\t%s\t", i, luaL_typename(L,i));
-    switch (lua_type(L, i)) {
-      case LUA_TNUMBER:
-        printf("%jd\n",(intmax_t)lua_tonumber(L,i));
-        break;
-      case LUA_TSTRING:
-        printf("%s\n",lua_tostring(L,i));
-        break;
-      case LUA_TBOOLEAN:
-        printf("%s\n", (lua_toboolean(L, i) ? "true" : "false"));
-        break;
-      case LUA_TNIL:
-        printf("%s\n", "nil");
-        break;
-      default:
-        printf("%p\n",lua_topointer(L,i));
-        break;
-    }
-  }
-}
+/*
+ * Keyword/global name completion.
+ * The actual enumeration logic here is a bit odd, since we need to
+ * walk through every (string) key in _G, and then artificially append
+ * language keywords to that list.
+ */
 
-static void* variable_first() {
+static void* token_first() {
 	lua_State* L = lua_softc.luap;
 	
 	lua_pushglobaltable(L);
 	lua_pushnil(L);
-	return (void*)(long long int)lua_next(L, -2);
+	return (void*)(intptr_t)!lua_next(L, -2);
 }
-static void* variable_next(void* rawlast) {
-	lua_State* L = lua_softc.luap;
+
+/*
+ * From the Lua 5.2 Reference Manual, short keywords commented out
+ * since shortcuts like "d<tab>" for "do" aren't likely to be 
+ * useful and will just clutter the list.
+ */
+
+static const char* keywords[] = {
+	"and", "break", /*"do",*/ "else", "elseif", "end",
+	"false", "for", "function", /*"if",*/ /*"in",*/ "local",
+	"nil", "not", /*"or",*/ "repeat", "return", "then",
+	"true", "until", "while"
+};
+
+static void* token_next(void* rawlast) {
+	intptr_t idx = (intptr_t)rawlast;
 	
-	return (void*)(long long int)lua_next(L, -2);
+	if (idx + 1 > (sizeof(keywords) / sizeof(keywords[0]))) {
+		return (void*)-1;
+	}
+	else if (idx > 0) {
+		return (void*)++idx;
+	}
+	else {
+		lua_State* L = lua_softc.luap;
+		
+		return (void*)(intptr_t)!lua_next(L, -2);
+	}
 }
-static void variable_tostring(void* rawlast, char* out, int len) {
-	lua_State* L = lua_softc.luap;
+static void token_tostring(void* rawlast, char* out, int len) {
+	intptr_t idx = (intptr_t)rawlast;
 	
-	int isfunction = lua_isfunction(L, -1);
-	lua_pop(L, 1);
-	
-	if (lua_isstring(L, -1)) {
-		lua_pushvalue(L, -1);
-		const char* value = lua_tolstring(L, -1, NULL);
+	if (idx > 0) {
+		snprintf(out, len, "%s", keywords[idx - 1]);
+	}
+	else {
+		lua_State* L = lua_softc.luap;
+		
+		int isfunction = lua_isfunction(L, -1);
 		lua_pop(L, 1);
 		
-		snprintf(out, len, isfunction ? "%s(" : "%s", value);
+		if (lua_isstring(L, -1)) {
+			lua_pushvalue(L, -1);
+			const char* value = lua_tolstring(L, -1, NULL);
+			lua_pop(L, 1);
+			
+			snprintf(out, len, isfunction ? "%s(" : "%s", value);
+		}
 	}
 }
 
 static void lua_completer(char* command, char* argv) {
 	lua_State* L = lua_softc.luap;
 	
+	/*
+	 * Since the "last" key is always left on the stack, we would need
+	 * to pop it "after" token_first, which isn't possible with how
+	 * the compleition works. Instead, we just set up a pseudo stack
+	 * frame and pop any leftover values.
+	 */
+	
 	int top = lua_gettop(L);
-	prompt_generic_complete(argv, variable_first, variable_next, NULL, variable_tostring);
+	prompt_generic_complete(argv, token_first, token_next, (void*)-1, token_tostring);
 	lua_settop(L, top);
 }
+
+/*
+ * Fallthrough completion, matches any undefined "command".
+ * Aka, nearly any Lua code, which allows us to jump in and try
+ * to complete Lua specifics without matching any "proper" commands.
+ */
 
 COMPLETION_SET(_, 0, lua_completer);
