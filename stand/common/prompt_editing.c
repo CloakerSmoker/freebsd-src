@@ -606,15 +606,26 @@ void prompt_complete_smart(void* data) {
 	}
 	
 	/*
-	 * There's two mechanisms to "glob" completion, either a "_" command which
-	 * matches any command name, or a "0" arg index, which matches any argument
-	 * number.
-	 * Note: * can't be used without adding a "tag" to the COMPLETION_SET macro
-	 * since the command name is directly embedded into an identifier.
+	 * There's two special cases for completion, either a "_" command which
+	 * matches any undefined command, or a "0" arg index, which matches any
+	 * argument number.
+	 * Matching an undefined command is an escape hatch for completing languages
+	 * which are too complicated to properly parse here, and the "0" arg index
+	 * is for commands involving flags and (again) more complicated parsing.
 	 */
 	
+	int defined = false;
+	
+	struct bootblk_command** pcmd;
+	SET_FOREACH(pcmd, Xcommand_set) {
+		if (strcmp((*pcmd)->c_name, command) == 0) {
+			defined = true;
+			break;
+		}
+	}
+	
 	prompt_completion_entry* entry = NULL;
-	prompt_completion_entry* wildcard = NULL;
+	prompt_completion_entry* fallthrough = NULL;
 	
 	prompt_completion_entry** pce;
 	SET_FOREACH(pce, Xcompleter_set) {
@@ -623,16 +634,16 @@ void prompt_complete_smart(void* data) {
 		if (strcmp(e->command, command) == 0 && (e->argn == 0 || e->argn == argc)) {
 			entry = e;
 		}
-		else if (strcmp(e->command, "_") == 0) {
-			wildcard = e;
+		else if (strcmp(e->command, "_") == 0 && !defined) {
+			fallthrough = e;
 		}
 	}
 	
 	LINE[cmdlen] = old;
 	
 	if (entry == NULL) {
-		if (wildcard != NULL) {
-			wildcard->completer(command, last);
+		if (fallthrough != NULL) {
+			fallthrough->completer(command, last);
 		}
 	}
 	else {
