@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
 struct prompt_buffer prompt_prompt = { 0 };
+const char * volatile	interp_identifier;
 
 /*
  * Interactive mode
@@ -50,9 +51,6 @@ struct prompt_buffer prompt_prompt = { 0 };
 void
 interact(void)
 {
-	static char		input[256];		/* big enough? */
-	const char * volatile	interp_identifier;
-
 	TSENTER();
 	
 	/*
@@ -79,7 +77,7 @@ interact(void)
 	 */
 	printf("\nType '?' for a list of commands, 'help' for more detailed help.\n");
 	if (getenv("prompt") == NULL)
-		setenv("prompt", "${interpret}", 1);const char * volatile	interp_identifier;
+		setenv("prompt", "${interpret}", 1);
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
 	
