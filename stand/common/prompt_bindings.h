@@ -61,6 +61,8 @@ void prompt_stroke_to_string(char *, size_t, struct prompt_input);
 void prompt_print_stroke(struct prompt_input);
 struct prompt_input prompt_parse_stroke(const char *);
 
+struct prompt_keybind *prompt_add_stroke_action_binding(char *, char *);
+
 struct prompt_keybind *prompt_first_binding();
 struct prompt_keybind *prompt_next_binding(struct prompt_keybind *);
 
