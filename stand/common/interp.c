@@ -100,7 +100,7 @@ interact(void)
 			}
 		}
 		
-		char* line = prompt_getline();
+		char *line = prompt_getline();
 		
 		printf("\r\n");
 		
