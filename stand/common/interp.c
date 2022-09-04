@@ -46,6 +46,49 @@ struct prompt_buffer prompt_prompt = { 0 };
 const char * volatile	interp_identifier;
 
 /*
+ * Hardcoded key bindings to avoid adding a new file, can be overridden
+ * with the "keybind" simp command, or the "keybind.register" Lua function.
+ *
+ * Since some consoles might not encode modifiers and special keys correctly
+ * some actions are assigned to multiple keys, just in case a console
+ * can only do modifiers OR special keys.
+ */
+
+struct {
+	char *stroke;
+	char *action;
+} default_keybinds[] = {
+	{"BS", "delete-backward-char"},
+	{"<delete>", "delete-forward-char"},
+	{"<left>", "backward-char"},
+	{"<right>", "forward-char"},
+	
+	{"M-<left>", "backward-word"},
+	{"M-<right>", "forward-word"},
+	
+	{"M-b", "backward-word"},
+	{"M-f", "forward-word"},
+	
+	{"<up>", "previous-history-element"},
+	{"<down>", "next-history-element"},
+	
+	{"TAB", "smart-complete"},
+	
+	{"<home>", "move-beginning-of-line"},
+	{"<end>", "move-end-of-line"},
+	
+	{"C-a", "move-beginning-of-line"},
+	{"C-e", "move-end-of-line"},
+	
+	{"C-y", "yank"},
+	{"C-k", "kill-line"},
+	{"M-d", "kill-word"},
+	{"M-<delete>", "backward-kill-word"},
+	
+	{NULL, NULL}
+};
+
+/*
  * Interactive mode
  */
 void
@@ -70,7 +113,13 @@ interact(void)
 	 */
 	autoboot_maybe();
 	
-	interp_include("/boot/keys.rc");
+	/*
+	 * Setup sane defaults for key bindings (anything unrecognized is ignored)
+	 */
+	
+	for (int i = 0; default_keybinds[i].stroke != NULL; i++) {
+		prompt_add_stroke_action_binding(default_keybinds[i].stroke, default_keybinds[i].action);
+	}
 	
 	/*
 	 * Not autobooting, go manual
