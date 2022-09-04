@@ -88,9 +88,9 @@ struct lua_keybind {
 };
 
 static void
-lua_keybind_handler(void* data)
+lua_keybind_handler(void *data)
 {
-	struct lua_keybind* bind = data;
+	struct lua_keybind *bind = data;
 	lua_State *L = lua_softc.luap;
 	
 	lua_rawgeti(L, LUA_REGISTRYINDEX, bind->callback_ref);
@@ -99,14 +99,13 @@ lua_keybind_handler(void* data)
 }
 
 static void
-delete_bind(lua_State* L, struct prompt_keybind* bind) {
-	/*
-	 * Delete a binding, unref-ing along the way if Lua owns it
-	 */
+delete_bind(lua_State *L, struct prompt_keybind *bind)
+{
+	/* Delete a binding, unref-ing along the way if Lua owns it */
 	
 	if (bind->action == lua_keybind_handler) {
-		void* data = sizeof(struct prompt_keybind) + (void*)bind;
-		struct lua_keybind* luabind = data;
+		void *data = sizeof(struct prompt_keybind) + (void*)bind;
+		struct lua_keybind *luabind = data;
 		
 		luaL_unref(L, LUA_REGISTRYINDEX, luabind->callback_ref);
 	}
@@ -129,7 +128,7 @@ lua_keybind_register(lua_State *L)
 		return 1;
 	}
 	
-	const char* stroke = lua_tostring(L, -2);
+	const char *stroke = lua_tostring(L, -2);
 	struct prompt_input input = prompt_parse_stroke(stroke);
 	
 	if (input.key == 0) {
@@ -137,7 +136,7 @@ lua_keybind_register(lua_State *L)
 		return 1;
 	}
 	
-	struct prompt_keybind* existing = prompt_find_binding(input.mods, input.key);
+	struct prompt_keybind *existing = prompt_find_binding(input.mods, input.key);
 	
 	if (existing != NULL) {
 		/*
@@ -147,7 +146,7 @@ lua_keybind_register(lua_State *L)
 		delete_bind(L, existing);
 	}
 	
-	struct prompt_keybind* bind = NULL;
+	struct prompt_keybind *bind = NULL;
 	
 	if (lua_islightuserdata(L, -1)) {
 		/*
@@ -158,13 +157,12 @@ lua_keybind_register(lua_State *L)
 		 * predefined action directly.
 		 */
 		
-		struct prompt_predefined_action* predef = lua_touserdata(L, -1);
+		struct prompt_predefined_action *predef = lua_touserdata(L, -1);
 		
 		bind = prompt_add_binding(input.mods, input.key, predef->action);
-	}
-	else {
-		struct prompt_keybind* bind = prompt_add_binding_raw(4, input.mods, input.key, lua_keybind_handler);
-		struct lua_keybind* luabind = sizeof(struct prompt_keybind) + (void*)bind;
+	} else {
+		struct prompt_keybind *bind = prompt_add_binding_raw(4, input.mods, input.key, lua_keybind_handler);
+		struct lua_keybind *luabind = sizeof(struct prompt_keybind) + (void*)bind;
 		
 		luabind->callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
@@ -193,7 +191,7 @@ lua_keybind_delete(lua_State *L)
 		return 1;
 	}
 	
-	struct prompt_keybind* bind = (struct prompt_keybind*)lua_touserdata(L, -1);
+	struct prompt_keybind *bind = (struct prompt_keybind*)lua_touserdata(L, -1);
 	
 	delete_bind(L, bind);
 	
@@ -220,7 +218,7 @@ lua_keybind_find(lua_State *L)
 		return 1;
 	}
 	
-	const char* stroke = lua_tostring(L, -1);
+	const char *stroke = lua_tostring(L, -1);
 	struct prompt_input input = prompt_parse_stroke(stroke);
 	
 	if (input.key == 0) {
@@ -228,7 +226,7 @@ lua_keybind_find(lua_State *L)
 		return 1;
 	}
 	
-	struct prompt_keybind* bind = prompt_find_binding(input.mods, input.key);
+	struct prompt_keybind *bind = prompt_find_binding(input.mods, input.key);
 	
 	if (bind == NULL) {
 		lua_pushnil(L);
@@ -255,7 +253,7 @@ lua_keybind_list(lua_State *L)
 	
 	lua_newtable(L);
 	
-	struct prompt_keybind* bind = prompt_first_binding();
+	struct prompt_keybind *bind = prompt_first_binding();
 	int i = 1;
 	
 	while (bind != NULL) {
@@ -290,10 +288,10 @@ luaopen_keybind(lua_State *L)
 	 * Build keybind.actions out of the list of predefined actions
 	 */
 	 
-	struct prompt_predefined_action** ppa;
+	struct prompt_predefined_action **ppa;
 	
 	SET_FOREACH(ppa, Xpredef_action_set) {
-		struct prompt_predefined_action* a = *ppa;
+		struct prompt_predefined_action *a = *ppa;
 		
 		lua_pushlightuserdata(L, a);
 		lua_setfield(L, -2, a->name);
@@ -323,7 +321,7 @@ lua_history_add(lua_State *L)
 		return 1;
 	}
 	
-	const char* entry = lua_tostring(L, -1);
+	const char *entry = lua_tostring(L, -1);
 	
 	prompt_history_add(entry, strlen(entry));
 	
@@ -347,7 +345,7 @@ lua_history_remove(lua_State *L)
 	
 	int index = (int)lua_tonumber(L, -1);
 	
-	struct prompt_history_entry* entry = prompt_history_first();
+	struct prompt_history_entry *entry = prompt_history_first();
 	int i = 0;
 	
 	while (entry != NULL) {
@@ -381,7 +379,7 @@ lua_history_list(lua_State *L)
 	
 	lua_newtable(L);
 	
-	struct prompt_history_entry* entry = prompt_history_first();
+	struct prompt_history_entry *entry = prompt_history_first();
 	int i = 1;
 	
 	while (entry != NULL) {
@@ -548,8 +546,10 @@ interp_include(const char *filename)
  * language keywords to that list.
  */
 
-static void* token_first() {
-	lua_State* L = lua_softc.luap;
+static void *
+token_first()
+{
+	lua_State *L = lua_softc.luap;
 	
 	lua_pushglobaltable(L);
 	lua_pushnil(L);
@@ -569,7 +569,9 @@ static const char* keywords[] = {
 	"true", "until", "while"
 };
 
-static void* token_next(void* rawlast) {
+static void *
+token_next(void *rawlast)
+{
 	intptr_t idx = (intptr_t)rawlast;
 	
 	if (idx + 1 > (sizeof(keywords) / sizeof(keywords[0]))) {
@@ -577,28 +579,29 @@ static void* token_next(void* rawlast) {
 	}
 	else if (idx > 0) {
 		return (void*)++idx;
-	}
-	else {
+	} else {
 		lua_State* L = lua_softc.luap;
 		
 		return (void*)(intptr_t)!lua_next(L, -2);
 	}
 }
-static void token_tostring(void* rawlast, char* out, int len) {
+static void
+token_tostring(void *rawlast, char *out, int len)
+{
 	intptr_t idx = (intptr_t)rawlast;
 	
 	if (idx > 0) {
 		snprintf(out, len, "%s", keywords[idx - 1]);
 	}
 	else {
-		lua_State* L = lua_softc.luap;
+		lua_State *L = lua_softc.luap;
 		
 		int isfunction = lua_isfunction(L, -1);
 		lua_pop(L, 1);
 		
 		if (lua_isstring(L, -1)) {
 			lua_pushvalue(L, -1);
-			const char* value = lua_tolstring(L, -1, NULL);
+			const char *value = lua_tolstring(L, -1, NULL);
 			lua_pop(L, 1);
 			
 			snprintf(out, len, isfunction ? "%s(" : "%s", value);
@@ -606,8 +609,10 @@ static void token_tostring(void* rawlast, char* out, int len) {
 	}
 }
 
-static void lua_completer(char* command, char* argv) {
-	lua_State* L = lua_softc.luap;
+static void
+lua_completer(char *command, char *argv)
+{
+	lua_State *L = lua_softc.luap;
 	
 	/*
 	 * Since the "last" key is always left on the stack, we would need
