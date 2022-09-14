@@ -1,3 +1,8 @@
+/*-
+ * Copyright (c) 2022 Connor Bailey
+ *
+ * SPDX-License-Identifier: BSD-2-clause
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
