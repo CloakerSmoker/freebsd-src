@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: BSD-2-clause
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <stand.h>
 #include <string.h>
 #include "bootstrap.h"
