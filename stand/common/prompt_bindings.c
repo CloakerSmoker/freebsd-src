@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: BSD-2-clause
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <stand.h>
 #include "bootstrap.h"
 
 #include "prompt_bindings.h"
+
+#define BS '\x8'
+#define TAB '\x9'
+#define CR '\xd'
+#define ESC '\x1b'
+#define DEL '\x7f'
 
 /*
  * In the input escape parser, we need to handle:
@@ -40,9 +43,9 @@ static char prompt_char_or_mods;
 static void
 unshift(struct prompt_input *result, char in)
 {
-	if ('A' <= in && in <= 'Z') {
+	if (isupper(in)) {
 		result->mods |= PROMPT_MOD_SHIFT;
-		in ^= 0x20;
+		in = tolower(in);
 	}
 	
 	result->key = in;
@@ -62,11 +65,10 @@ prompt_parse_input(char next)
 	
 	switch (prompt_esc_state) {
 		case ESC_NORMAL:
-			if (next == 0x1b) {
+			if (next == ESC) {
 				prompt_esc_state = ESC_ESC;
 			}
-			else if (next <= 0x1f && next != 0x8 && next != 0x9 && next != 0xd)
-			{
+			else if (iscntrl(next) && next != BS && next != TAB && next != CR) {
 				/*
 				 * Control characters turn into ctrl+key
 				 */
@@ -98,8 +100,7 @@ prompt_parse_input(char next)
 				result.key = PROMPT_ANSI_TO_KEY + next;
 				prompt_esc_state = ESC_NORMAL;
 			}
-			else if ('1' <= next && next <= '9')
-			{
+			else if ('1' <= next && next <= '9') {
 				prompt_esc_state = ESC_BRACKET_EITHER;
 				prompt_mods_or_code = next;
 			} else {
@@ -175,8 +176,8 @@ prompt_input_to_char(struct prompt_input input)
 {
 	if (input.key > 0) {
 		if (input.mods & PROMPT_MOD_SHIFT) {
-			if ('a' <= input.key && input.key <= 'z') {
-				return input.key ^ 0x20;
+			if (islower(input.key)) {
+				return toupper(input.key);
 			}
 		}
 		else if (input.mods) {
@@ -275,12 +276,12 @@ struct keyname_map {
  */
 
 static struct keyname_map emacs_shortname_to_key[] = {
-	{"BS", 0x8},
-	{"TAB", 0x9},
-	{"RET", 0x0a},
-	{"ESC", 0x1b},
-	{"SPC", 0x20},
-	{"DEL", 0x7f},
+	{"BS", BS},
+	{"TAB", TAB},
+	{"RET", CR},
+	{"ESC", ESC},
+	{"SPC", ' '},
+	{"DEL", DEL},
 	{0, 0}
 };
 
@@ -352,7 +353,7 @@ prompt_stroke_to_string(char *buf, size_t len, struct prompt_input stroke)
 		}
 	}
 	
-	if (0 <= stroke.key && stroke.key <= 0x20) {
+	if (iscntrl(stroke.key)) {
 		/*
 		 * Control characters
 		 */
@@ -365,9 +366,9 @@ prompt_stroke_to_string(char *buf, size_t len, struct prompt_input stroke)
 			off += snprintf(&buf[off], len, "\\x%x", stroke.key);
 		}
 	}
-	else if (0x20 <= stroke.key && stroke.key <= 126) {
+	else if (!iscntrl(stroke.key) && stroke.key != ' ') {
 		/*
-		 * Printable characters
+		 * Printable characters (no isprint, easy enough to fake)
 		 */
 		
 		off += snprintf(&buf[off], len, "%c", stroke.key);
@@ -450,9 +451,9 @@ prompt_parse_stroke(const char *stroke)
 		
 		char ascii = *p;
 		
-		if ('A' <= ascii && ascii <= 'Z') {
+		if (isupper(ascii)) {
 			result.mods |= PROMPT_MOD_SHIFT;
-			ascii ^= 0x20;
+			ascii = tolower(ascii);
 		}
 		
 		result.key = ascii;

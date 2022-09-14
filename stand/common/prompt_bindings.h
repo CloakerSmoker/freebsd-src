@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: BSD-2-clause
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
 #include <sys/queue.h>
 
 struct prompt_input {
