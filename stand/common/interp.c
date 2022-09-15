@@ -62,24 +62,24 @@ struct {
 	{"<delete>", "delete-forward-char"},
 	{"<left>", "backward-char"},
 	{"<right>", "forward-char"},
-	
+
 	{"M-<left>", "backward-word"},
 	{"M-<right>", "forward-word"},
-	
+
 	{"M-b", "backward-word"},
 	{"M-f", "forward-word"},
-	
+
 	{"<up>", "previous-history-element"},
 	{"<down>", "next-history-element"},
-	
+
 	{"TAB", "smart-complete"},
-	
+
 	{"<home>", "move-beginning-of-line"},
 	{"<end>", "move-end-of-line"},
-	
+
 	{"C-a", "move-beginning-of-line"},
 	{"C-e", "move-end-of-line"},
-	
+
 	{"C-y", "yank"},
 	{"C-k", "kill-line"},
 	{"M-d", "kill-word"},
@@ -95,7 +95,7 @@ void
 interact(void)
 {
 	TSENTER();
-	
+
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by
 	 * the compiler as it's considered an externally observable event.  This
@@ -112,15 +112,15 @@ interact(void)
 	 * Before interacting, we might want to autoboot.
 	 */
 	autoboot_maybe();
-	
+
 	/*
 	 * Setup sane defaults for key bindings (anything unrecognized is ignored)
 	 */
-	
+
 	for (int i = 0; default_keybinds[i].stroke != NULL; i++) {
 		prompt_add_stroke_action_binding(default_keybinds[i].stroke, default_keybinds[i].action);
 	}
-	
+
 	/*
 	 * Not autobooting, go manual
 	 */
@@ -129,16 +129,16 @@ interact(void)
 		setenv("prompt", "${interpret}", 1);
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
-	
+
 	prompt_init();
-	
+
 	for (;;) {
 		prompt_reset();
 		interp_emit_prompt();
-		
+
 		for (;;) {
 			char n = prompt_on_input(getchar());
-			
+
 			if (n == 0xd)
 			{
 				break;
@@ -148,11 +148,11 @@ interact(void)
 				prompt_rawinput(n);
 			}
 		}
-		
+
 		char *line = prompt_getline();
-		
+
 		printf("\r\n");
-		
+
 		interp_run(line);
 	}
 }

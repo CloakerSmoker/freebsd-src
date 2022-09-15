@@ -20,10 +20,10 @@ struct prompt_buffer {
 	char line[PROMPT_LINE_LENGTH + 1];
 	int cursor;
 	int gap;
-	
+
 	char kill[PROMPT_LINE_LENGTH + 1];
 	int killcursor;
-	
+
 	TAILQ_HEAD(prompt_history_head, prompt_history_entry) history_head;
 	struct prompt_history_entry *history_cursor;
 };
