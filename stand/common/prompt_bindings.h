@@ -16,14 +16,14 @@ typedef void(*prompt_action)(void*);
 struct prompt_keybind {
 	struct prompt_input target;
 	prompt_action action;
-	
+
 	STAILQ_ENTRY(prompt_keybind) next;
 };
 
 struct prompt_predefined_action {
 	char *name;
 	prompt_action action;
-	
+
 	STAILQ_ENTRY(prompt_predefined_action) next;
 };
 

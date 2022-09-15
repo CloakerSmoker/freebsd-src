@@ -47,7 +47,7 @@ unshift(struct prompt_input *result, char in)
 		result->mods |= PROMPT_MOD_SHIFT;
 		in = tolower(in);
 	}
-	
+
 	result->key = in;
 }
 
@@ -62,7 +62,7 @@ struct prompt_input
 prompt_parse_input(char next)
 {
 	struct prompt_input result = { 0 };
-	
+
 	switch (prompt_esc_state) {
 		case ESC_NORMAL:
 			if (next == ESC) {
@@ -72,7 +72,7 @@ prompt_parse_input(char next)
 				/*
 				 * Control characters turn into ctrl+key
 				 */
-				
+
 				result.key = next - 1 + 'a';
 				result.mods |= PROMPT_MOD_CTRL;
 			} else {
@@ -84,7 +84,7 @@ prompt_parse_input(char next)
 				prompt_esc_state = ESC_BRACKET;
 			} else {
 				/* "ESC char" turns back into alt+char */
-				
+
 				result.mods |= PROMPT_MOD_ALT;
 				unshift(&result, next);
 				prompt_esc_state = ESC_NORMAL;
@@ -96,7 +96,7 @@ prompt_parse_input(char next)
 				 * Plain ANSI escapes without modifiers terminate after the first
 				 * non-numeric character
 				 */
-				
+
 				result.key = PROMPT_ANSI_TO_KEY + next;
 				prompt_esc_state = ESC_NORMAL;
 			}
@@ -107,7 +107,7 @@ prompt_parse_input(char next)
 				/*
 				 * "ESC [ char" into alt+char, mainly for "ESC [ [" to work
 				 */
-				
+
 				result.mods |= PROMPT_MOD_ALT;
 				unshift(&result, next);
 				prompt_esc_state = ESC_NORMAL;
@@ -121,23 +121,23 @@ prompt_parse_input(char next)
 				/*
 				 * VT escape terminated by ~, mods_or_code is a code
 				 */
-				
+
 				prompt_mods_or_code -= '1';
-				
+
 				if (prompt_mods_or_code < 8) {
 					result.key = prompt_vt[(int)prompt_mods_or_code];
 				}
-				
+
 				prompt_esc_state = ESC_NORMAL;
 			} else {
 				/*
 				 * ESC [ mods ; char
 				 */
-				
+
 				result.mods = prompt_mods_or_code - '0' - 1;
-				
+
 				unshift(&result, next);
-				
+
 				prompt_esc_state = ESC_NORMAL;
 			}
 			break;
@@ -147,27 +147,27 @@ prompt_parse_input(char next)
 			break;
 		case ESC_CODE_MODS_END:
 			result.mods = prompt_char_or_mods - '0' - 1;
-			
+
 			if (next == '~') {
 				/* VT escape terminated by ~, mods_or_code is a code */
-				
+
 				prompt_mods_or_code -= '1';
-				
+
 				if (prompt_mods_or_code < 8) {
 					result.key = prompt_vt[(int)prompt_mods_or_code];
 				}
 			}
 			else if (prompt_mods_or_code == '1' && ('A' <= next && next <= 'Z')) {
 				/* ANSI escape in the "ESC [ mods ; char" format */
-				
+
 				result.key = PROMPT_ANSI_TO_KEY + next;
 			}
-			
+
 			prompt_esc_state = ESC_NORMAL;
-			
+
 			break;
 	}
-	
+
 	return result;
 }
 
@@ -183,10 +183,10 @@ prompt_input_to_char(struct prompt_input input)
 		else if (input.mods) {
 			return 0;
 		}
-		
+
 		return input.key;
 	}
-	
+
 	return 0;
 }
 
@@ -197,13 +197,13 @@ struct prompt_keybind *
 prompt_find_binding(char mods, char key)
 {
 	struct prompt_keybind *p;
-	
+
 	STAILQ_FOREACH(p, &prompt_binds_head, next) {
 		if (p->target.mods == mods && p->target.key == key) {
 			return p;
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -214,22 +214,22 @@ prompt_add_binding_raw(int extraspace, char mods, char key, prompt_action action
 	 * Allocate extra space on the end of the result for the caller to use how
 	 * they like, it will be passed to their callback.
 	 */
-	
+
 	struct prompt_keybind* result = prompt_find_binding(mods, key);
 	int new = result == NULL;
-	
+
 	if (new) {
 		result = malloc(sizeof(struct prompt_keybind) + extraspace);
 	}
-	
+
 	result->target.mods = mods;
 	result->target.key = key;
 	result->action = action;
-	
+
 	if (new) {
 		STAILQ_INSERT_TAIL(&prompt_binds_head, result, next);
 	}
-	
+
 	return result;
 }
 
@@ -243,7 +243,7 @@ void
 prompt_remove_binding(struct prompt_keybind *bind)
 {
 	STAILQ_REMOVE(&prompt_binds_head, bind, prompt_keybind, next);
-	
+
 	free(bind);
 }
 
@@ -251,18 +251,18 @@ char
 prompt_on_input(char in)
 {
 	struct prompt_input input = prompt_parse_input(in);
-	
+
 	struct prompt_keybind *binding = prompt_find_binding(input.mods, input.key);
-	
+
 	if (binding != NULL) {
 		/*
 		 * Pass any caller data stored past the end of the binding
 		 */
-		
+
 		binding->action(sizeof(struct prompt_keybind) + (void*)binding);
 		return 0;
 	}
-	
+
 	return prompt_input_to_char(input);
 }
 
@@ -307,30 +307,30 @@ static char
 lookup_key_from_name(struct keyname_map *map, const char *name)
 {
 	int i = 0;
-	
+
 	while (map[i].key != 0) {
 		if (strcmp(map[i].name, name) == 0) {
 			return map[i].key;
 		}
-		
+
 		i++;
 	}
-	
+
 	return 0;
 }
 static char *
 lookup_name_from_key(struct keyname_map *map, const char key)
 {
 	int i = 0;
-	
+
 	while (map[i].key != 0) {
 		if (map[i].key == key) {
 			return map[i].name;
 		}
-		
+
 		i++;
 	}
-	
+
 	return 0;
 }
 
@@ -338,28 +338,28 @@ void
 prompt_stroke_to_string(char *buf, size_t len, struct prompt_input stroke)
 {
 	int off = 0;
-	
+
 	if (stroke.mods) {
 		if (stroke.mods & PROMPT_MOD_ALT) {
 			off += snprintf(&buf[off], len, "M-");
 		}
-		
+
 		if (stroke.mods & PROMPT_MOD_CTRL) {
 			off += snprintf(&buf[off], len, "C-");
 		}
-		
+
 		if (stroke.mods & PROMPT_MOD_SHIFT) {
 			off += snprintf(&buf[off], len, "S-");
 		}
 	}
-	
+
 	if (iscntrl(stroke.key)) {
 		/*
 		 * Control characters
 		 */
-		
+
 		char *name = lookup_name_from_key(emacs_shortname_to_key, stroke.key);
-		
+
 		if (name) {
 			off += snprintf(&buf[off], len, "%s", name);
 		} else {
@@ -370,15 +370,15 @@ prompt_stroke_to_string(char *buf, size_t len, struct prompt_input stroke)
 		/*
 		 * Printable characters (no isprint, easy enough to fake)
 		 */
-		
+
 		off += snprintf(&buf[off], len, "%c", stroke.key);
 	} else {
 		/*
 		 * Special characters
 		 */
-		
+
 		char *name = lookup_name_from_key(emacs_longname_to_key, stroke.key);
-		
+
 		if (name) {
 			off += snprintf(&buf[off], len, "%s", name);
 		} else {
@@ -391,9 +391,9 @@ void
 prompt_print_stroke(struct prompt_input stroke)
 {
 	char buf[20] = { 0 };
-	
+
 	prompt_stroke_to_string(buf, sizeof(buf), stroke);
-	
+
 	printf("%s", buf);
 }
 
@@ -401,14 +401,14 @@ struct prompt_input
 prompt_parse_stroke(const char *stroke)
 {
 	struct prompt_input result = { 0 };
-	
+
 	int len = strlen(stroke);
 	const char *p = stroke;
-	
+
 	/*
 	 * Any number of "X-" modifiers, back to back
 	 */
-	
+
 	while (len >= 3 && p[1] == '-') {
 		switch (*p) {
 			case 'C':
@@ -421,44 +421,44 @@ prompt_parse_stroke(const char *stroke)
 				result.mods |= PROMPT_MOD_SHIFT;
 				break;
 		}
-		
+
 		p += 2;
 		len -= 2;
 	}
-	
+
 	if (len != 1) {
 		/*
 		 * More left to parse than a single character like "M-x"
 		 */
-		
+
 		if (p[0] == '<') {
 			/*
 			 * "M-<special>"
 			 */
-			
+
 			result.key = lookup_key_from_name(emacs_longname_to_key, p);
 		} else {
 			/*
 			 * "M-CTRL"
 			 */
-			
+
 			result.key = lookup_key_from_name(emacs_shortname_to_key, p);
 		}
 	} else {
 		/*
 		 * A single character, might include shift as a modifier if it is uppercase
 		 */
-		
+
 		char ascii = *p;
-		
+
 		if (isupper(ascii)) {
 			result.mods |= PROMPT_MOD_SHIFT;
 			ascii = tolower(ascii);
 		}
-		
+
 		result.key = ascii;
 	}
-	
+
 	return result;
 }
 
@@ -477,11 +477,11 @@ struct prompt_keybind *
 prompt_add_stroke_binding(char *stroke, prompt_action action)
 {
 	struct prompt_input input = prompt_parse_stroke(stroke);
-	
+
 	if (input.mods == 0 && input.key == 0) {
 		return NULL;
 	}
-	
+
 	return prompt_add_binding(input.mods, input.key, action);
 }
 
@@ -500,15 +500,15 @@ static struct prompt_predefined_action *
 find_predef_by_name(char *name)
 {
 	struct prompt_predefined_action **ppa;
-	
+
 	SET_FOREACH(ppa, Xpredef_action_set) {
 		struct prompt_predefined_action *a = *ppa;
-		
+
 		if (strcmp(a->name, name) == 0) {
 			return a;
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -516,15 +516,15 @@ static struct prompt_predefined_action *
 find_predef_by_action(prompt_action action)
 {
 	struct prompt_predefined_action **ppa;
-	
+
 	SET_FOREACH(ppa, Xpredef_action_set) {
 		struct prompt_predefined_action *a = *ppa;
-		
+
 		if (a->action == action) {
 			return a;
 		}
 	}
-	
+
 	return NULL;
 }
 
@@ -532,11 +532,11 @@ struct prompt_keybind *
 prompt_add_stroke_action_binding(char *stroke, char *action_name)
 {
 	struct prompt_predefined_action *predef = find_predef_by_name(action_name);
-	
+
 	if (predef == NULL) {
 		return NULL;
 	}
-	
+
 	return prompt_add_stroke_binding(stroke, predef->action);
 }
 
@@ -549,14 +549,14 @@ command_keybind(int argc, char *argv[])
 		command_errmsg = "wrong number of arguments";
 		return CMD_ERROR;
 	}
-	
+
 	struct prompt_keybind *bind = prompt_add_stroke_action_binding(argv[1], argv[2]);
-	
+
 	if (bind != NULL) {
 		return CMD_OK;
 	} else {
 		snprintf(command_errbuf, sizeof(command_errbuf), "could not bind '%s' to '%s'", argv[1], argv[2]);
-		
+
 		return CMD_ERROR;
 	}
 }
@@ -567,12 +567,12 @@ static int
 command_keybinds(int argc, char *argv[])
 {
 	struct prompt_keybind *p;
-	
+
 	STAILQ_FOREACH(p, &prompt_binds_head, next) {
 		prompt_print_stroke(p->target);
-		
+
 		struct prompt_predefined_action *predef = find_predef_by_action(p->action);
-		
+
 		if (predef != NULL) {
 			printf(" %s\n", predef->name);
 		} else {
@@ -580,11 +580,11 @@ command_keybinds(int argc, char *argv[])
 			 * Wouldn't be very kind of us to dig into Lua's data stored after the
 			 * binding, so we have to default to a generic name for Lua actions.
 			 */
-			
+
 			printf(" <interpreter callback %p>\n", p->action);
 		}
 	}
-	
+
 	return CMD_OK;
 }
 
@@ -596,23 +596,23 @@ command_keyunbind(int argc, char *argv[]) {
 		command_errmsg = "wrong number of arguments";
 		return CMD_ERROR;
 	}
-	
+
 	struct prompt_input stroke = prompt_parse_stroke(argv[1]);
-	
+
 	if (stroke.mods == 0 && stroke.key == 0) {
 		command_errmsg = "could not parse key stroke";
 		return CMD_ERROR;
 	}
-	
+
 	struct prompt_keybind *bind = prompt_find_binding(stroke.mods, stroke.key);
-	
+
 	if (bind == NULL) {
 		command_errmsg = "could not find any binding for key stroke";
 		return CMD_ERROR;
 	}
-	
+
 	prompt_remove_binding(bind);
-	
+
 	return CMD_OK;
 }
 
@@ -624,14 +624,14 @@ command_showkey(int argc, char *argv[]) {
 		command_errmsg = "wrong number of arguments";
 		return CMD_ERROR;
 	}
-	
+
 	struct prompt_input in = { 0 };
-	
+
 	while (in.mods == 0 && in.key == 0)
 		in = prompt_parse_input(getchar());
-	
+
 	prompt_print_stroke(in);
 	printf("\n");
-	
+
 	return CMD_OK;
 }
