@@ -82,7 +82,6 @@ interp_lua_realloc(void *ud __unused, void *ptr, size_t osize __unused, size_t n
  * Appended onto each keybind created from Lua, callback_ref
  * is just the registry index of a callback
  */
-
 struct lua_keybind {
 	int callback_ref;
 };
@@ -102,7 +101,6 @@ static void
 delete_bind(lua_State *L, struct prompt_keybind *bind)
 {
 	/* Delete a binding, unref-ing along the way if Lua owns it */
-
 	if (bind->action == lua_keybind_handler) {
 		void *data = sizeof(struct prompt_keybind) + (void*)bind;
 		struct lua_keybind *luabind = data;
@@ -139,10 +137,7 @@ lua_keybind_register(lua_State *L)
 	struct prompt_keybind *existing = prompt_find_binding(input.mods, input.key);
 
 	if (existing != NULL) {
-		/*
-		 * Delete a existing binding to prevent a leak
-		 */
-
+		/* Delete any prexisting binding to prevent a leak */
 		delete_bind(L, existing);
 	}
 
@@ -156,7 +151,6 @@ lua_keybind_register(lua_State *L)
 		 * Instead of wrapping a Lua function, just call to the
 		 * predefined action directly.
 		 */
-
 		struct prompt_predefined_action *predef = lua_touserdata(L, -1);
 
 		bind = prompt_add_binding(input.mods, input.key, predef->action);
@@ -171,7 +165,6 @@ lua_keybind_register(lua_State *L)
 	 * Return the binding as lightuserdata, so it can be passed to
 	 * keybind.delete to be removed
 	 */
-
 	lua_pushlightuserdata(L, bind);
 	return 1;
 }
@@ -202,9 +195,7 @@ lua_keybind_delete(lua_State *L)
 static int
 lua_keybind_find(lua_State *L)
 {
-	/*
-	 * Find a binding by name so it can be deleted
-	 */
+	/* Find a binding by name so it can be deleted */
 
 	int argc = lua_gettop(L);
 
@@ -240,10 +231,7 @@ lua_keybind_find(lua_State *L)
 static int
 lua_keybind_list(lua_State *L)
 {
-	/*
-	 * Get a list of all bound keys
-	 */
-
+	/* Get a list of all bound keys */
 	int argc = lua_gettop(L);
 
 	if (argc != 0) {
@@ -284,12 +272,8 @@ luaopen_keybind(lua_State *L)
 
 	lua_newtable(L);
 
-	/*
-	 * Build keybind.actions out of the list of predefined actions
-	 */
-
+	/* Build keybind.actions out of the list of predefined actions */
 	struct prompt_predefined_action **ppa;
-
 	SET_FOREACH(ppa, Xpredef_action_set) {
 		struct prompt_predefined_action *a = *ppa;
 
@@ -305,10 +289,7 @@ luaopen_keybind(lua_State *L)
 static int
 lua_history_add(lua_State *L)
 {
-	/*
-	 * Artificially add a line the the prompt history
-	 */
-
+	/* Artificially add a line the the prompt history */
 	int argc = lua_gettop(L);
 
 	if (argc != 1) {
@@ -332,10 +313,7 @@ lua_history_add(lua_State *L)
 static int
 lua_history_remove(lua_State *L)
 {
-	/*
-	 * Remove a line from the history, identified by index
-	 */
-
+	/* Remove a line from the history, identified by index */
 	int argc = lua_gettop(L);
 
 	if (argc != 1) {
@@ -366,10 +344,7 @@ lua_history_remove(lua_State *L)
 static int
 lua_history_list(lua_State *L)
 {
-	/*
-	 * Get a list of all lines in the history
-	 */
-
+	/* Get a list of all lines in the history */
 	int argc = lua_gettop(L);
 
 	if (argc != 0) {
@@ -545,7 +520,6 @@ interp_include(const char *filename)
  * walk through every (string) key in _G, and then artificially append
  * language keywords to that list.
  */
-
 static void *
 token_first()
 {
@@ -558,10 +532,9 @@ token_first()
 
 /*
  * From the Lua 5.2 Reference Manual, short keywords commented out
- * since shortcuts like "d<tab>" for "do" aren't likely to be 
+ * since shortcuts like "d<tab>" for "do" aren't likely to be
  * useful and will just clutter the list.
  */
-
 static const char* keywords[] = {
 	"and", "break", /*"do",*/ "else", "elseif", "end",
 	"false", "for", "function", /*"if",*/ /*"in",*/ "local",
@@ -580,7 +553,7 @@ token_next(void *rawlast)
 	else if (idx > 0) {
 		return (void*)++idx;
 	} else {
-		lua_State* L = lua_softc.luap;
+		lua_State *L = lua_softc.luap;
 
 		return (void*)(intptr_t)!lua_next(L, -2);
 	}
@@ -620,7 +593,6 @@ lua_completer(char *command, char *argv)
 	 * the compleition works. Instead, we just set up a pseudo stack
 	 * frame and pop any leftover values.
 	 */
-
 	int top = lua_gettop(L);
 	prompt_generic_complete(argv, token_first, token_next, (void*)-1, token_tostring);
 	lua_settop(L, top);
@@ -631,5 +603,4 @@ lua_completer(char *command, char *argv)
  * Aka, nearly any Lua code, which allows us to jump in and try
  * to complete Lua specifics without matching any "proper" commands.
  */
-
 COMPLETION_SET(_, 0, lua_completer);

@@ -84,7 +84,7 @@ struct {
 	{"C-k", "kill-line"},
 	{"M-d", "kill-word"},
 	{"M-<delete>", "backward-kill-word"},
-	
+
 	{NULL, NULL}
 };
 
@@ -139,12 +139,10 @@ interact(void)
 		for (;;) {
 			char n = prompt_on_input(getchar());
 
-			if (n == 0xd)
-			{
+			if (n == '\r') {
 				break;
 			}
-			else if (n != 0)
-			{
+			else if (n != 0) {
 				prompt_rawinput(n);
 			}
 		}

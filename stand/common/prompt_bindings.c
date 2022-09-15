@@ -52,7 +52,6 @@ unshift(struct prompt_input *result, char in)
 }
 
 /* Map [1-9]~ VT codes back into keycodes */
-
 static char prompt_vt[] = {
 	PROMPT_KEY_HOME, PROMPT_KEY_INSERT, PROMPT_KEY_DELETE, PROMPT_KEY_END,
 	PROMPT_KEY_PGUP, PROMPT_KEY_PGDN, PROMPT_KEY_HOME, PROMPT_KEY_END
@@ -69,10 +68,7 @@ prompt_parse_input(char next)
 				prompt_esc_state = ESC_ESC;
 			}
 			else if (iscntrl(next) && next != BS && next != TAB && next != CR) {
-				/*
-				 * Control characters turn into ctrl+key
-				 */
-
+				/* Control characters turn into ctrl+key */
 				result.key = next - 1 + 'a';
 				result.mods |= PROMPT_MOD_CTRL;
 			} else {
@@ -84,7 +80,6 @@ prompt_parse_input(char next)
 				prompt_esc_state = ESC_BRACKET;
 			} else {
 				/* "ESC char" turns back into alt+char */
-
 				result.mods |= PROMPT_MOD_ALT;
 				unshift(&result, next);
 				prompt_esc_state = ESC_NORMAL;
@@ -96,7 +91,6 @@ prompt_parse_input(char next)
 				 * Plain ANSI escapes without modifiers terminate after the first
 				 * non-numeric character
 				 */
-
 				result.key = PROMPT_ANSI_TO_KEY + next;
 				prompt_esc_state = ESC_NORMAL;
 			}
@@ -104,10 +98,7 @@ prompt_parse_input(char next)
 				prompt_esc_state = ESC_BRACKET_EITHER;
 				prompt_mods_or_code = next;
 			} else {
-				/*
-				 * "ESC [ char" into alt+char, mainly for "ESC [ [" to work
-				 */
-
+				/* "ESC [ char" into alt+char, mainly for "ESC [ [" to work */
 				result.mods |= PROMPT_MOD_ALT;
 				unshift(&result, next);
 				prompt_esc_state = ESC_NORMAL;
@@ -118,10 +109,7 @@ prompt_parse_input(char next)
 				prompt_esc_state = ESC_CODE_MODS;
 			}
 			else if (next == '~') {
-				/*
-				 * VT escape terminated by ~, mods_or_code is a code
-				 */
-
+				/* VT escape terminated by ~, mods_or_code is a code */
 				prompt_mods_or_code -= '1';
 
 				if (prompt_mods_or_code < 8) {
@@ -130,14 +118,9 @@ prompt_parse_input(char next)
 
 				prompt_esc_state = ESC_NORMAL;
 			} else {
-				/*
-				 * ESC [ mods ; char
-				 */
-
+				/* ESC [ mods ; char */
 				result.mods = prompt_mods_or_code - '0' - 1;
-
 				unshift(&result, next);
-
 				prompt_esc_state = ESC_NORMAL;
 			}
 			break;
@@ -150,7 +133,6 @@ prompt_parse_input(char next)
 
 			if (next == '~') {
 				/* VT escape terminated by ~, mods_or_code is a code */
-
 				prompt_mods_or_code -= '1';
 
 				if (prompt_mods_or_code < 8) {
@@ -159,7 +141,6 @@ prompt_parse_input(char next)
 			}
 			else if (prompt_mods_or_code == '1' && ('A' <= next && next <= 'Z')) {
 				/* ANSI escape in the "ESC [ mods ; char" format */
-
 				result.key = PROMPT_ANSI_TO_KEY + next;
 			}
 
@@ -214,7 +195,6 @@ prompt_add_binding_raw(int extraspace, char mods, char key, prompt_action action
 	 * Allocate extra space on the end of the result for the caller to use how
 	 * they like, it will be passed to their callback.
 	 */
-
 	struct prompt_keybind* result = prompt_find_binding(mods, key);
 	int new = result == NULL;
 
@@ -255,10 +235,7 @@ prompt_on_input(char in)
 	struct prompt_keybind *binding = prompt_find_binding(input.mods, input.key);
 
 	if (binding != NULL) {
-		/*
-		 * Pass any caller data stored past the end of the binding
-		 */
-
+		/* Pass any caller data stored past the end of the binding */
 		binding->action(sizeof(struct prompt_keybind) + (void*)binding);
 		return 0;
 	}
@@ -274,7 +251,6 @@ struct keyname_map {
 /*
  * Control characters
  */
-
 static struct keyname_map emacs_shortname_to_key[] = {
 	{"BS", BS},
 	{"TAB", TAB},
@@ -286,9 +262,8 @@ static struct keyname_map emacs_shortname_to_key[] = {
 };
 
 /*
- * Special characters
+ * Special keys
  */
-
 static struct keyname_map emacs_longname_to_key[] = {
 	{"<left>", PROMPT_KEY_LEFT},
 	{"<up>", PROMPT_KEY_UP},
@@ -354,10 +329,6 @@ prompt_stroke_to_string(char *buf, size_t len, struct prompt_input stroke)
 	}
 
 	if (iscntrl(stroke.key)) {
-		/*
-		 * Control characters
-		 */
-
 		char *name = lookup_name_from_key(emacs_shortname_to_key, stroke.key);
 
 		if (name) {
@@ -366,17 +337,11 @@ prompt_stroke_to_string(char *buf, size_t len, struct prompt_input stroke)
 			off += snprintf(&buf[off], len, "\\x%x", stroke.key);
 		}
 	}
-	else if (!iscntrl(stroke.key) && stroke.key != ' ') {
-		/*
-		 * Printable characters (no isprint, easy enough to fake)
-		 */
-
+	else if (isgraph(stroke.key) && stroke.key != ' ') {
+		/* Printable characters (no isprint, easy enough to fake) */
 		off += snprintf(&buf[off], len, "%c", stroke.key);
 	} else {
-		/*
-		 * Special characters
-		 */
-
+		/* Special characters */
 		char *name = lookup_name_from_key(emacs_longname_to_key, stroke.key);
 
 		if (name) {
@@ -405,10 +370,7 @@ prompt_parse_stroke(const char *stroke)
 	int len = strlen(stroke);
 	const char *p = stroke;
 
-	/*
-	 * Any number of "X-" modifiers, back to back
-	 */
-
+	/* Any number of "X-" modifiers, back to back */
 	while (len >= 3 && p[1] == '-') {
 		switch (*p) {
 			case 'C':
@@ -427,28 +389,16 @@ prompt_parse_stroke(const char *stroke)
 	}
 
 	if (len != 1) {
-		/*
-		 * More left to parse than a single character like "M-x"
-		 */
-
+		/* More left to parse than a single character like "M-x" */
 		if (p[0] == '<') {
-			/*
-			 * "M-<special>"
-			 */
-
+			/* "M-<special>" */
 			result.key = lookup_key_from_name(emacs_longname_to_key, p);
 		} else {
-			/*
-			 * "M-CTRL"
-			 */
-
+			/* "M-CTRL" */
 			result.key = lookup_key_from_name(emacs_shortname_to_key, p);
 		}
 	} else {
-		/*
-		 * A single character, might include shift as a modifier if it is uppercase
-		 */
-
+		/* A single character, might include shift as a modifier if it is uppercase */
 		char ascii = *p;
 
 		if (isupper(ascii)) {
@@ -495,7 +445,6 @@ prompt_add_stroke_binding(char *stroke, prompt_action action)
  * and then each entry in keybind.actions can be passed to keybind.register to
  * accomplish the same as the simp "keybind" command.
  */
-
 static struct prompt_predefined_action *
 find_predef_by_name(char *name)
 {
@@ -580,7 +529,6 @@ command_keybinds(int argc, char *argv[])
 			 * Wouldn't be very kind of us to dig into Lua's data stored after the
 			 * binding, so we have to default to a generic name for Lua actions.
 			 */
-
 			printf(" <interpreter callback %p>\n", p->action);
 		}
 	}
