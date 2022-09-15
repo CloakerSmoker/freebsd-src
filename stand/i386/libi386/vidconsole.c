@@ -1070,80 +1070,83 @@ vidc_putchar(int c)
 		vidc_biosputchar(c);
 }
 
+#define BIOS_KBD_FLAG_LSHIFT 0x1
+#define BIOS_KBD_FLAG_RSHIFT 0x2
+#define BIOS_KBD_FLAG_CTRL 0x4
+#define BIOS_KBD_FLAG_ALT 0x8
+
+#define ANSI_MODS_FLAG_SHIFT 0x1
+#define ANSI_MODS_FLAG_ALT 0x2
+#define ANSI_MODS_FLAG_CTRL 0x4
+
 /*
  * Converts BIOS keyboard flags into a PC style modifer mask
  */
-
 static char
-keybuf_kss2mod(uint32_t kss) {
+keybuf_kss2mod(uint32_t kss)
+{
 	char modifiers = 0;
-	
-	if ((kss & 0x1) ||
-		(kss & 0x2)) {
+
+	if (kss & (BIOS_KBD_FLAG_LSHIFT | BIOS_KBD_FLAG_RSHIFT)) {
 		/* left shift or right shift */
-		
-		modifiers |= 1;
+		modifiers |= ANSI_MODS_FLAG_SHIFT;
 	}
-	
-	if (kss & 0x4) {
+
+	if (kss & BIOS_KBD_FLAG_CTRL) {
 		/* ctrl */
-		
-		modifiers |= 4;
+		modifiers |= ANSI_MODS_FLAG_CTRL;
 	}
-	
-	if (kss & 0x8) {
+
+	if (kss & BIOS_KBD_FLAG_ALT) {
 		/* alt */
-		
-		modifiers |= 2;
+		modifiers |= ANSI_MODS_FLAG_ALT;
 	}
-	
+
 	return '1' + modifiers;
 }
 
 /*
  * Writes a VT220 style input escape to keybuf, with modifiers
  */
-
 static int
-keybuf_insvt(const char keycode, uint32_t kss) {
+keybuf_insvt(const char keycode, uint32_t kss)
+{
 	int i = 0;
-	
+
 	keybuf[i++] = '[';
 	keybuf[i++] = keycode;
-	
+
 	if ((kss & 0xf) != 0) {
 		/* ignore all BIOS keyboard flags besides shift/ctrl/alt */
-		
 		keybuf[i++] = ';';
 		keybuf[i++] = keybuf_kss2mod(kss);
 	}
-	
+
 	keybuf[i++] = '~';
-	
+
 	return 0x1b; /* esc */
 }
 
 /*
  * Writes a xtern style input escape to keybuf, with modifiers
  */
-
 static int
-keybuf_insxterm(const char key, uint32_t kss) {
+keybuf_insxterm(const char key, uint32_t kss)
+{
 	int i = 0;
-	
+
 	keybuf[i++] = '[';
-	
+
 	if ((kss & 0xf) != 0) {
 		/* ignore all BIOS keyboard flags besides shift/ctrl/alt */
-		
 		keybuf[i++] = '1';
 		keybuf[i++] = ';';
-		
+
 		keybuf[i++] = keybuf_kss2mod(kss);
 	}
-	
+
 	keybuf[i++] = key;
-	
+
 	return 0x1b; /* esc */
 }
 
@@ -1163,7 +1166,6 @@ keybuf_insxterm(const char key, uint32_t kss) {
  * the same as the normal scancodes, only the embedded ASCII code
  * changes.
  */
-
 struct bios_scancode_remap {
 	union {
 		struct {
@@ -1171,14 +1173,14 @@ struct bios_scancode_remap {
 				unsigned char normal;
 				unsigned char shift;
 			};
-			
+
 			unsigned char ctrl;
 			unsigned char alt;
 		};
-		
+
 		unsigned char codes[3];
 	};
-	
+
 	char ascii;
 };
 
@@ -1225,8 +1227,8 @@ static struct bios_scancode_remap bios_sc_map[] = {
 	{0x1a, 0x1a, 0x1a, '['},
 	{0x1b, 0x1b, 0x1b, ']'},
 	{0x27, 0xff, 0x27, ';'},
-	{0x28, 0xff, 0xff, '\''}, 
-	{0x29, 0xff, 0xff, '`'}, 
+	{0x28, 0xff, 0xff, '\''},
+	{0x29, 0xff, 0xff, '`'},
 	{0x0e, 0x0e, 0x0e, 0x08}, /* backspace */
 	{0x53, 0x93, 0xa3, 0x00}, /* del */
 	{0x50, 0x91, 0xa0, 0x00}, /* down */
@@ -1262,40 +1264,38 @@ vidc_getchar(void)
 		v86.addr = 0x16;
 		v86.eax = 0x0;
 		v86int();
-		
+
 		int scancode = (v86.eax & 0xff00) >> 8;
 		int character = v86.eax & 0xff;
-		
+
 		v86.ctl = 0;
 		v86.addr = 0x16;
 		v86.eax = 0x200;
 		v86int();
-		
+
 		int modifiers = v86.eax & 0xff;
-		
 		int len = sizeof(bios_sc_map) / sizeof(bios_sc_map[0]);
-		
+
 		for (int i = 0; i < len; i++) {
-			struct bios_scancode_remap* map = &bios_sc_map[i];
-			
+			struct bios_scancode_remap *map = &bios_sc_map[i];
+
 			for (int c = 0; c < 3; c++) {
 				if (map->codes[c] == scancode) {
 					scancode = map->normal;
-					
+
 					if (character == 0) {
-						/* 
+						/*
 						 * preserve character from BIOS so we don't
 						 * have to manually handle shift/control
 						 */
-						
 						character = map->ascii;
 					}
-					
+
 					break;
 				}
 			}
 		}
-		
+
 		switch (scancode) {
 		case 0x48:	/* up */
 			return keybuf_insxterm('A', modifiers);
@@ -1318,16 +1318,14 @@ vidc_getchar(void)
 		case 0x51: /* pgdn */
 			return keybuf_insvt('6', modifiers);
 		default:
-			if (modifiers & 0x8) {
-				/* alt */
-				
+			if (modifiers & BIOS_KBD_FLAG_ALT) {
 				if (('a' <= character) && (character <= 'z')) {
 					keybuf[0] = character;
-					
+
 					return (0x1b); /* esc */
 				}
 			}
-			
+
 			return character;
 		}
 	} else {

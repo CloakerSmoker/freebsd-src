@@ -30,7 +30,6 @@ prompt_show_aftergap()
 	 * Clear to end of line, reprint "LINE[GAP:END]", move cursor back so it is
 	 * right before the contents of the gap.
 	 */
-
 	int gaplen = PROMPT_LINE_LENGTH - GAP;
 	char *aftergap = &LINE[GAP];
 
@@ -56,10 +55,7 @@ prompt_reprint()
 void
 prompt_reset()
 {
-	/*
-	 * Called to simulate "end of line" in the gap buffer
-	 */
-
+	/* Called to simulate "end of line" in the gap buffer */
 	CURSOR = 0;
 	GAP = PROMPT_LINE_LENGTH;
 	LINE[GAP] = '\0';
@@ -68,10 +64,7 @@ prompt_reset()
 void
 prompt_init()
 {
-	/*
-	 * Called once to get the buffer ready to go
-	 */
-
+	/* Called once to get the buffer ready to go */
 	prompt_reset();
 	KILLCURSOR = 0;
 	KILL[KILLCURSOR] = '\0';
@@ -82,14 +75,10 @@ prompt_init()
 void
 prompt_rawinput(char in)
 {
-	/*
-	 * Add a character to the buffer without processing it as input
-	 */
-
+	/* Add a character to the buffer without processing it as input */
 	LINE[CURSOR++] = in;
 
 	printf("%c", in);
-
 	prompt_show_aftergap();
 }
 
@@ -105,7 +94,6 @@ prompt_getline()
 	 * the history pointer. This makes the next "history-previous-element" get
 	 * the item which we just added to the history.
 	 */
-
 	prompt_move_end_of_line(NULL);
 	LINE[CURSOR] = '\0';
 	HISTORYCURSOR = NULL;
@@ -148,7 +136,6 @@ prompt_delete_backward_char(void *data)
 		LINE[--CURSOR] = '\0';
 
 		putchar('\b');
-
 		prompt_show_aftergap();
 	}
 }
@@ -202,30 +189,28 @@ PREDEF_ACTION_SET("move-beginning-of-line", prompt_move_beginning_of_line);
 static int
 count_forward_word()
 {
-	/*
-	 * Ignore whitespace, then consume a whole word forward
-	 */
-
+	/* Ignore whitespace, then consume a whole word forward */
 	int gapsize = PROMPT_LINE_LENGTH - GAP;
 	int run = 0;
 
-	for (; run < gapsize && isspace(LINE[GAP + run]); run++);
-	for (; run < gapsize && isgraph(LINE[GAP + run]); run++);
+	for (; run < gapsize && isspace(LINE[GAP + run]); run++)
+		continue;
+	for (; run < gapsize && isgraph(LINE[GAP + run]); run++)
+		continue;
 
 	return run;
 }
 static int
 count_backward_word()
 {
-	/*
-	 * Ignore whitespace, then consume a whole word backward
-	 */
-
+	/* Ignore whitespace, then consume a whole word backward */
 	int cursorsize = CURSOR;
 	int run = 0;
 
-	for (; run < cursorsize && isspace(LINE[CURSOR - run - 1]); run++);
-	for (; run < cursorsize && isgraph(LINE[CURSOR - run - 1]); run++);
+	for (; run < cursorsize && isspace(LINE[CURSOR - run - 1]); run++)
+		continue;
+	for (; run < cursorsize && isgraph(LINE[CURSOR - run - 1]); run++)
+		continue;
 
 	return run;
 }
@@ -269,7 +254,6 @@ prompt_yank(void *data)
 	 * Copy KILL[0:KILLCURSOR] back into LINE, starting at CURSOR
 	 * (pushing the gap back)
 	 */
-
 	if (KILLCURSOR) {
 		for (int i = 0; i < KILLCURSOR; i++) {
 			LINE[CURSOR++] = KILL[i];
@@ -288,10 +272,7 @@ prompt_forward_kill_word(void *data)
 	int run = count_forward_word();
 
 	if (run != 0) {
-		/*
-		 * Find a word, copy it into KILL, then remove it from the gap
-		 */
-
+		/* Find a word, copy it into KILL, then remove it from the gap */
 		memcpy(KILL, &LINE[GAP], run);
 		KILLCURSOR = run;
 
@@ -308,10 +289,7 @@ prompt_backward_kill_word(void *data)
 	int run = count_backward_word();
 
 	if (run != 0) {
-		/*
-		 * Find a word, copy it into KILL, then remove it from the end of CURSOR
-		 */
-
+		/* Find a word, copy it into KILL, then remove it from the end of CURSOR */
 		memcpy(KILL, &LINE[CURSOR - run], run);
 		KILLCURSOR = run;
 
@@ -336,7 +314,6 @@ prompt_kill_line(void *data)
 		 * Kill an entire line, CURSOR is already 0'd by moving to the start of the
 		 * line, so we just need to reset GAP to reset the buffer.
 		 */
-
 		memcpy(KILL, &LINE[GAP], gapsize);
 		KILLCURSOR = gapsize;
 
@@ -354,7 +331,6 @@ prompt_recall_history(struct prompt_history_entry *entry)
 	/*
 	 * Clear the command line, then recall a whole line from history (if there is one)
 	 */
-
 	prompt_move_beginning_of_line(NULL);
 	prompt_reset();
 	prompt_show_aftergap();
@@ -373,7 +349,6 @@ prompt_next_history_element(void *data)
 	 * "next-history-element" functions as "delete-line" when at the start of
 	 * history
 	 */
-
 	if (HISTORYCURSOR != NULL) {
 		HISTORYCURSOR = TAILQ_NEXT(HISTORYCURSOR, entry);
 	}
@@ -390,11 +365,9 @@ prompt_previous_history_element(void *data)
 	 * "previous-history-element" at the start of history starts at the most
 	 * recently added entry
 	 */
-
 	if (HISTORYCURSOR == NULL) {
 		HISTORYCURSOR = TAILQ_LAST(HISTORY, prompt_history_head);
-	}
-	else {
+	} else {
 		HISTORYCURSOR = TAILQ_PREV(HISTORYCURSOR, prompt_history_head, entry);
 	}
 
@@ -442,15 +415,12 @@ COMMAND_SET(history, "history", "display history entries", command_history);
 static int
 command_history(int argc, char *argv[])
 {
-	struct prompt_history_entry *e;
-
-	/*
-	 * Pop the "history" entry from the history
-	 */
+	/* Pop the "history" entry from the history */
 	prompt_history_remove(TAILQ_LAST(HISTORY, prompt_history_head));
 
 	pager_open();
 
+	struct prompt_history_entry *e;
 	TAILQ_FOREACH(e, HISTORY, entry) {
 		pager_output(e->line);
 		pager_output("\n");
@@ -478,7 +448,6 @@ prompt_generic_complete(char *argv, generic_completer_first first, generic_compl
 	 * item that we've matched, in all cases we just remember what the
 	 * item stringified to (and recall that instead).
 	 */
-
 	char buf[40] = { 0 };
 
 	char maxbuf[40] = { 0 };
@@ -489,7 +458,7 @@ prompt_generic_complete(char *argv, generic_completer_first first, generic_compl
 
 	int arglen = strlen(argv);
 
-	void* p = first();
+	void *p = first();
 
 	while (p != last) {
 		tostring(p, buf, sizeof(buf));
@@ -515,10 +484,7 @@ prompt_generic_complete(char *argv, generic_completer_first first, generic_compl
 		return;
 	}
 	else if (matches == 1) {
-		/*
-		 * Single match, just complete it.
-		 */
-
+		/* Single match, just complete it. */
 		char *remainder = matchbuf + arglen;
 		int rlen = strlen(remainder);
 
@@ -533,7 +499,6 @@ prompt_generic_complete(char *argv, generic_completer_first first, generic_compl
 		 * end of the prefix so you can "jump" through options by just typing
 		 * the few characters of difference.
 		 */
-
 		char *prefixbuf = maxbuf;
 		int prefixlen = strlen(prefixbuf);
 
@@ -594,7 +559,6 @@ prompt_generic_complete(char *argv, generic_completer_first first, generic_compl
 /*
  * Command completer
  */
-
 static void *
 command_first()
 {
@@ -626,7 +590,6 @@ PREDEF_ACTION_SET("command-complete", prompt_complete_command);
 /*
  * "smart"/context sensitive completer
  */
-
 void
 prompt_complete_smart(void *data)
 {
@@ -634,14 +597,14 @@ prompt_complete_smart(void *data)
 	 * "smart" completion, completes a command if there isn't one typed out
 	 * already, or tries to complete command arguments.
 	 */
-
 	if (GAP != PROMPT_LINE_LENGTH) {
 		return;
 	}
 
 	int cmdlen = 0;
 
-	for (; cmdlen < CURSOR && isalnum(LINE[cmdlen]); cmdlen++);
+	for (; cmdlen < CURSOR && isalnum(LINE[cmdlen]); cmdlen++)
+		continue;
 
 	if (!(isspace(LINE[cmdlen]) || ispunct(LINE[cmdlen])) || cmdlen == CURSOR) {
 		prompt_complete_command(NULL);
@@ -661,7 +624,6 @@ prompt_complete_smart(void *data)
 	 * has enough context to actually complete the argument.
 	 * Doesn't need to be bulletproof since we only need the last arg, and the count.
 	 */
-
 	int argc = 1;
 	char *last = args;
 	char *next = strpbrk(args, "\t\f\v ");
@@ -682,7 +644,6 @@ prompt_complete_smart(void *data)
 	 * which are too complicated to properly parse here, and the "0" arg index
 	 * is for commands involving flags and (again) more complicated parsing.
 	 */
-
 	int defined = false;
 
 	struct bootblk_command **pcmd;
@@ -848,7 +809,6 @@ path_tostring(void *rawlast, char *out, int len)
 	 * In practice, the only path *with* a trailing "/" is going to be "/"
 	 * itself since our dirname/basename split will always destroy the last "/".
 	 */
-
 	int dirnamelen = snprintf(out, len, "%s", path_dirname);
 	out += dirnamelen;
 	len -= dirnamelen;
@@ -885,7 +845,6 @@ path_completer(char *command, char *argv)
 	 * to throw away the basename and match against the (already absolute)
 	 * path in argv, which is why we operate on the copy "path" instead.
 	 */
-
 	char path[128] = { 0 };
 	snprintf(path, 128, "%s", argv);
 

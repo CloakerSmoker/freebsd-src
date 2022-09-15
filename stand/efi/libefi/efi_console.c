@@ -1287,70 +1287,74 @@ keybuf_ischar(void)
 	return (false);
 }
 
+#define ANSI_MODS_FLAG_SHIFT 0x1
+#define ANSI_MODS_FLAG_ALT 0x2
+#define ANSI_MODS_FLAG_CTRL 0x4
+
 /*
  * Converts an EFI key shift state into a PC style modifier mask
  */
-
 static char
-keybuf_kss2mod(uint32_t kss) {
+keybuf_kss2mod(uint32_t kss)
+{
 	char modifiers = 0;
-	
+
 	if (kss & EFI_RIGHT_SHIFT_PRESSED ||
 		kss & EFI_LEFT_SHIFT_PRESSED) {
-		modifiers |= 1;
+		modifiers |= ANSI_MODS_FLAG_SHIFT;
 	}
-	
+
 	if (kss & EFI_RIGHT_ALT_PRESSED ||
 		kss & EFI_LEFT_ALT_PRESSED) {
-		modifiers |= 2;
+		modifiers |= ANSI_MODS_FLAG_ALT;
 	}
-	
+
 	if (kss & EFI_RIGHT_CONTROL_PRESSED ||
 		kss & EFI_LEFT_CONTROL_PRESSED) {
-		modifiers |= 4;
+		modifiers |= ANSI_MODS_FLAG_CTRL;
 	}
-	
+
 	return '1' + modifiers;
 }
 
 /*
  * Writes a VT220 style input escape to keybuf, with modifiers
  */
-
 static void
-keybuf_insvt(const char keycode, uint32_t kss) {
+keybuf_insvt(const char keycode, uint32_t kss)
+{
 	int i = 0;
-	
+
 	keybuf[i++] = 0x1b; /* esc */
 	keybuf[i++] = '[';
 	keybuf[i++] = keycode;
-	
+
 	if (kss & EFI_SHIFT_STATE_VALID) {
 		keybuf[i++] = ';';
 		keybuf[i++] = keybuf_kss2mod(kss);
 	}
-	
+
 	keybuf[i++] = '~';
 }
 
 /*
  * Writes a xterm style input escape to keybuf, with modifiers
  */
-
 static void
-keybuf_insxterm(const char key, uint32_t kss) {
+keybuf_insxterm(const char key, uint32_t kss)
+{
 	int i = 0;
-	
+
 	keybuf[i++] = 0x1b; /* esc */
 	keybuf[i++] = '[';
-	
+
 	if (kss & EFI_SHIFT_STATE_VALID) {
 		keybuf[i++] = '1';
 		keybuf[i++] = ';';
-		
+
 		keybuf[i++] = keybuf_kss2mod(kss);
 	}
-	
+
 	keybuf[i++] = key;
 }
 
@@ -1379,18 +1383,17 @@ keybuf_inschar(EFI_INPUT_KEY *key, uint32_t kss)
 			/*
 			 * alt+[a-z] to esc
 			 */
-			
 			keybuf[0] = 0x1b;	/* esc */
-			
+
 			if (key->UnicodeChar >= 'a' &&
 				key->UnicodeChar <= 'z') {
 				keybuf[1] = key->UnicodeChar;
-				
+
 				return;
 			}
 		}
 	}
-	
+
 	switch (key->ScanCode) {
 	case SCAN_UP: /* UP */
 		keybuf_insxterm('A', kss);
@@ -1411,7 +1414,7 @@ keybuf_inschar(EFI_INPUT_KEY *key, uint32_t kss)
 		keybuf_insxterm('F', kss);
 		break;
 	case SCAN_INSERT:
-		/* 
+		/*
 		 * Fall back on vt sequences, since xterm sequences don't
 		 * cover ins/del/pgup/pgdn
 		 */
