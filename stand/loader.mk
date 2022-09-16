@@ -5,7 +5,7 @@
 CFLAGS+=-I${LDRSRC}
 
 SRCS+=	boot.c commands.c console.c devopen.c interp.c 
-SRCS+=	interp_backslash.c interp_parse.c prompt_bindings.c prompt_editing.c ls.c misc.c 
+SRCS+=	interp_backslash.c interp_parse.c ls.c misc.c 
 SRCS+=	module.c nvstore.c pnglite.c tslog.c
 
 CFLAGS.module.c += -I$(SRCTOP)/sys/teken -I${SRCTOP}/contrib/pnglite
@@ -83,6 +83,11 @@ CFLAGS+=	-DBOOT_PROMPT_123
 
 .if defined(LOADER_INSTALL_SUPPORT)
 SRCS+=	install.c
+.endif
+
+.if ${LOADER_EDITING_SUPPORT:Uyes} == "yes"
+CFLAGS+= -DLOADER_EDITING_SUPPORT
+SRCS+=	prompt_bindings.c prompt_editing.c
 .endif
 
 # Filesystem support

@@ -37,13 +37,11 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "bootstrap.h"
 
+#ifdef LOADER_EDITING_SUPPORT
 #include "prompt_bindings.h"
 #include "prompt_editing.h"
 
-#define	MAXARGS	20			/* maximum number of arguments allowed */
-
 struct prompt_buffer prompt_prompt = { 0 };
-const char * volatile	interp_identifier;
 
 /*
  * Hardcoded key bindings to avoid adding a new file, can be overridden
@@ -87,6 +85,11 @@ struct {
 
 	{NULL, NULL}
 };
+#endif // LOADER_EDITING_SUPPORT
+
+#define	MAXARGS	20			/* maximum number of arguments allowed */
+
+const char * volatile	interp_identifier;
 
 /*
  * Interactive mode
@@ -94,6 +97,10 @@ struct {
 void
 interact(void)
 {
+#ifndef LOADER_EDITING_SUPPORT
+	static char		input[256];		/* big enough? */
+#endif // LOADER_EDITING_SUPPORT
+
 	TSENTER();
 
 	/*
@@ -113,13 +120,14 @@ interact(void)
 	 */
 	autoboot_maybe();
 
+#ifdef LOADER_EDITING_SUPPORT
 	/*
 	 * Setup sane defaults for key bindings (anything unrecognized is ignored)
 	 */
-
 	for (int i = 0; default_keybinds[i].stroke != NULL; i++) {
 		prompt_add_stroke_action_binding(default_keybinds[i].stroke, default_keybinds[i].action);
 	}
+#endif // LOADER_EDITING_SUPPORT
 
 	/*
 	 * Not autobooting, go manual
@@ -130,6 +138,7 @@ interact(void)
 	if (getenv("interpret") == NULL)
 		setenv("interpret", "OK", 1);
 
+#ifdef LOADER_EDITING_SUPPORT
 	prompt_init();
 
 	for (;;) {
@@ -153,6 +162,14 @@ interact(void)
 
 		interp_run(line);
 	}
+#else
+	for (;;) {
+		input[0] = '\0';
+		interp_emit_prompt();
+		ngets(input, sizeof(input));
+		interp_run(input);
+	}
+#endif // LOADER_EDITING_SUPPORT
 }
 
 /*
