@@ -52,7 +52,7 @@ unshift(struct prompt_input *result, char in)
 }
 
 /* Map [1-9]~ VT codes back into keycodes */
-static char prompt_vt[] = {
+static int prompt_vt[] = {
 	PROMPT_KEY_HOME, PROMPT_KEY_INSERT, PROMPT_KEY_DELETE, PROMPT_KEY_END,
 	PROMPT_KEY_PGUP, PROMPT_KEY_PGDN, PROMPT_KEY_HOME, PROMPT_KEY_END
 };
@@ -175,7 +175,7 @@ STAILQ_HEAD(prompt_binds, prompt_keybind) prompt_binds_head =
 	 STAILQ_HEAD_INITIALIZER(prompt_binds_head);
 
 struct prompt_keybind *
-prompt_find_binding(char mods, char key)
+prompt_find_binding(char mods, int key)
 {
 	struct prompt_keybind *p;
 
@@ -189,7 +189,7 @@ prompt_find_binding(char mods, char key)
 }
 
 struct prompt_keybind *
-prompt_add_binding_raw(int extraspace, char mods, char key, prompt_action action)
+prompt_add_binding_raw(int extraspace, char mods, int key, prompt_action action)
 {
 	/*
 	 * Allocate extra space on the end of the result for the caller to use how
@@ -214,7 +214,7 @@ prompt_add_binding_raw(int extraspace, char mods, char key, prompt_action action
 }
 
 struct prompt_keybind *
-prompt_add_binding(char mods, char key, prompt_action action)
+prompt_add_binding(char mods, int key, prompt_action action)
 {
 	return prompt_add_binding_raw(0, mods, key, action);
 }
@@ -245,7 +245,7 @@ prompt_on_input(char in)
 
 struct keyname_map {
 	char *name;
-	char key;
+	int key;
 };
 
 /*
@@ -278,7 +278,7 @@ static struct keyname_map emacs_longname_to_key[] = {
 	{0, 0}
 };
 
-static char
+static int
 lookup_key_from_name(struct keyname_map *map, const char *name)
 {
 	int i = 0;
@@ -294,7 +294,7 @@ lookup_key_from_name(struct keyname_map *map, const char *name)
 	return 0;
 }
 static char *
-lookup_name_from_key(struct keyname_map *map, const char key)
+lookup_name_from_key(struct keyname_map *map, const int key)
 {
 	int i = 0;
 

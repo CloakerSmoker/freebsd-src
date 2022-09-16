@@ -7,8 +7,8 @@
 #include <sys/queue.h>
 
 struct prompt_input {
+	int key;
 	char mods;
-	char key;
 };
 
 typedef void(*prompt_action)(void*);
@@ -31,7 +31,7 @@ struct prompt_predefined_action {
 #define	PROMPT_MOD_ALT 2
 #define	PROMPT_MOD_CTRL 4
 
-#define	PROMPT_ANSI_TO_KEY 0x80
+#define	PROMPT_ANSI_TO_KEY 0x100
 #define	PROMPT_KEY_UP (PROMPT_ANSI_TO_KEY + 'A')
 #define	PROMPT_KEY_DOWN (PROMPT_ANSI_TO_KEY + 'B')
 #define	PROMPT_KEY_RIGHT (PROMPT_ANSI_TO_KEY + 'C')
@@ -54,9 +54,9 @@ char prompt_input_to_char(struct prompt_input input);
  */
 char prompt_on_input(char);
 
-struct prompt_keybind *prompt_find_binding(char, char);
-struct prompt_keybind *prompt_add_binding_raw(int, char, char, prompt_action);
-struct prompt_keybind *prompt_add_binding(char, char, prompt_action);
+struct prompt_keybind *prompt_find_binding(char, int);
+struct prompt_keybind *prompt_add_binding_raw(int, char, int, prompt_action);
+struct prompt_keybind *prompt_add_binding(char, int, prompt_action);
 void prompt_remove_binding(struct prompt_keybind *);
 
 void prompt_stroke_to_string(char *, size_t, struct prompt_input);
