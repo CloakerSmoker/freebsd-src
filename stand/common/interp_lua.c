@@ -78,6 +78,8 @@ interp_lua_realloc(void *ud __unused, void *ptr, size_t osize __unused, size_t n
 	return realloc(ptr, nsize);
 }
 
+#ifdef LOADER_EDITING_SUPPORT
+
 /*
  * Appended onto each keybind created from Lua, callback_ref
  * is just the registry index of a callback
@@ -245,6 +247,9 @@ lua_keybind_list(lua_State *L)
 	int i = 1;
 
 	while (bind != NULL) {
+		/*
+		 * Longest keystroke is M-C-S-<delete> (14 chars), add some for safety
+		 */
 		char buf[20] = { 0 };
 		prompt_stroke_to_string(buf, sizeof(buf), bind->target);
 
@@ -382,6 +387,8 @@ luaopen_history(lua_State *L)
 	return 1;
 }
 
+#endif // LOADER_EDITING_SUPPORT
+
 /*
  * The libraries commented out below either lack the proper
  * support from libsa, or they are unlikely to be useful
@@ -403,8 +410,10 @@ static const luaL_Reg loadedlibs[] = {
   {"lfs", luaopen_lfs},
   {"loader", luaopen_loader},
   {"pager", luaopen_pager},
+#ifdef LOADER_EDITING_SUPPORT
   {"keybind", luaopen_keybind},
   {"history", luaopen_history},
+#endif // LOADER_EDITING_SUPPORT
   {NULL, NULL}
 };
 
@@ -514,6 +523,8 @@ interp_include(const char *filename)
 	return (luaL_dofile(softc->luap, filename));
 }
 
+#if LOADER_EDITING_SUPPORT
+
 /*
  * Keyword/global name completion.
  * The actual enumeration logic here is a bit odd, since we need to
@@ -604,3 +615,5 @@ lua_completer(char *command, char *argv)
  * to complete Lua specifics without matching any "proper" commands.
  */
 COMPLETION_SET(_, 0, lua_completer);
+
+#endif // LOADER_EDITING_SUPPORT
