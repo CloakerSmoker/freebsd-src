@@ -1,3 +1,5 @@
+This branch is part of a GSoC 2022 project aimed to improve quality of life in the bootloader (mostly at the command prompt), see [README-GSOC](README-GSOC.md) for more info.
+
 FreeBSD Source:
 ---------------
 This is the top level of the FreeBSD source directory.
